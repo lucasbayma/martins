@@ -1,0 +1,52 @@
+   Compiling martins v0.1.0 (/Users/bayma/dev/lucas/martins)
+warning: field `0` is never read
+  --> src/watcher.rs:13:13
+   |
+13 |     Changed(PathBuf),
+   |     ------- ^^^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `FsEvent` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+   |
+13 -     Changed(PathBuf),
+13 +     Changed(()),
+   |
+
+warning: field `0` is never read
+  --> src/watcher.rs:14:13
+   |
+14 |     Removed(PathBuf),
+   |     ------- ^^^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `FsEvent` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+   |
+14 -     Removed(PathBuf),
+14 +     Removed(()),
+   |
+
+warning: method `unwatch` is never used
+  --> src/watcher.rs:83:12
+   |
+41 | impl Watcher {
+   | ------------ method in this implementation
+...
+83 |     pub fn unwatch(&mut self, path: &Path) -> Result<()> {
+   |            ^^^^^^^
+
+warning: `martins` (bin "martins" test) generated 3 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.11s
+     Running unittests src/main.rs (target/debug/deps/martins-19e2720fcf8cd205)
+
+running 3 tests
+test watcher::tests::detect_change ... ok
+test watcher::tests::filter_noise ... ok
+test watcher::tests::debounce_rapid ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 41 filtered out; finished in 2.42s
+
