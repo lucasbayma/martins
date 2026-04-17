@@ -82,11 +82,11 @@ Entregar um binário Rust `martins` que roda em macOS e Linux, apresentando uma 
 - README com instruções de instalação e uso
 
 ### Definition of Done
-- [ ] `cargo build --release` produz binário funcional no macOS e Linux
-- [ ] `cargo test` passa com 100% dos testes (sem meta numérica de coverage no MVP — coverage measurement é v2)
-- [ ] `cargo clippy --all-targets -- -D warnings` passa sem erros
-- [ ] `cargo fmt --check` passa
-- [ ] Smoke test E2E via tmux: `cd {tempdir-com-git-init-e-1-commit}` → `martins` (detecta o repo via `Repository::discover`) → criar workspace → spawn bash → modificar arquivo → ver no sidebar direito → arquivar → sair → re-abrir dentro do mesmo repo → workspace arquivado persistiu
+- [x] `cargo build --release` produz binário funcional no macOS e Linux
+- [x] `cargo test` passa com 100% dos testes (sem meta numérica de coverage no MVP — coverage measurement é v2)
+- [x] `cargo clippy --all-targets -- -D warnings` passa sem erros
+- [x] `cargo fmt --check` passa
+- [x] Smoke test E2E via tmux: `cd {tempdir-com-git-init-e-1-commit}` → `martins` (detecta o repo via `Repository::discover`) → criar workspace → spawn bash → modificar arquivo → ver no sidebar direito → arquivar → sair → re-abrir dentro do mesmo repo → workspace arquivado persistiu
 - [ ] Release workflow dispara em tag `v0.1.0`, gera universal binary macOS + Linux x86_64, smoke test passa, release draft criada
 - [ ] Homebrew formula sintaxe válida; `brew tap` + `brew install` instala o binário corretamente (teste manual após primeiro release)
 - [ ] Snapshot tests determinísticos: arquivos `*.snap` committados no repo; `INSTA_UPDATE=no cargo test` passa sem diffs
@@ -2189,7 +2189,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(agents): selection with preflight validation at creation`
 
-- [ ] 24. **README + install instructions**
+- [x] 24. **README + install instructions**
 
   **What to do**:
   - `README.md` com seções:
@@ -2269,7 +2269,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `docs: readme install instructions and keybindings`
 
-- [ ] 25. **Release CI: universal macOS binary + Linux binary + GitHub Release**
+- [x] 25. **Release CI: universal macOS binary + Linux binary + GitHub Release**
 
   **What to do**:
   - Criar `.github/workflows/release.yml` com:
@@ -2404,7 +2404,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `ci(release): universal macos binary linux binary and github release workflow`
 
-- [ ] 26. **Homebrew tap + formula + install smoke test**
+- [x] 26. **Homebrew tap + formula + install smoke test**
 
   **What to do**:
   - Documentar no README: instruções para criar o repo separado `homebrew-martins` (mesmo owner) — ESTE repo não é criado automaticamente, é setup manual uma vez.
@@ -2590,7 +2590,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
 > 4 agentes revisores em PARALELO. TODOS devem APROVAR. Apresentar resultados consolidados ao usuário e obter "okay" explícito antes de marcar como completo.
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
 
   **What to do**: Ler o plano inteiro. Para cada "Must Have": verificar que implementação existe (abrir arquivo, executar comando, checar binário). Para cada "Must NOT Have": grep no codebase por padrões proibidos — rejeitar com file:line se encontrado. Checar evidências em `.sisyphus/evidence/`. Comparar deliverables contra plano.
 
@@ -2633,7 +2633,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Output**: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
 
   **What to do**: Rodar build + lint + fmt + test. Revisar arquivos por padrões de baixa qualidade (unwrap/expect em produção, todo!, PT/EN misturado, nomes genéricos, imports não usados, código comentado, AI slop).
 
@@ -2665,7 +2665,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Output**: `Build [PASS/FAIL] | Clippy [PASS/FAIL] | Fmt [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
-- [ ] F3. **Real Manual QA E2E** — `unspecified-high` (via `Bash` + tmux detached sessions)
+- [x] F3. **Real Manual QA E2E** — `unspecified-high` (via `Bash` + tmux detached sessions)
 
   **What to do**: Rodar do estado limpo via tmux. Executar TODO cenário QA de TODA task — seguir passos exatos, capturar evidências. Testar integração cross-task single-repo + edge cases.
 
@@ -2736,7 +2736,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Output**: `Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
 
   **What to do**: Para cada task: ler "What to do", ler diff real (git log/diff). Verificar 1:1 — tudo na spec foi construído (sem faltar), nada além da spec foi construído (sem creep). Checar compliance com "Must NOT do". Detectar contaminação cross-task e flags de v2 vazando.
 
@@ -2846,14 +2846,14 @@ cargo fmt --check                              # Expected: zero diffs
 > **CLI surface (intentional simplicity)**: martins has NO subcommands. It accepts only `--version` / `-V` and `--help` / `-h`. Anything else ignored or errors. No config file CLI flags in MVP. This is enforced in T1 (the initial main.rs handles these before TUI init).
 
 ### Final Checklist
-- [ ] Todos os "Must Have" presentes
-- [ ] Todos os "Must NOT Have" ausentes (grep confirma)
-- [ ] Todos os testes passam
+- [x] Todos os "Must Have" presentes
+- [x] Todos os "Must NOT Have" ausentes (grep confirma)
+- [x] Todos os testes passam
 - [ ] Todos os snapshot tests passam com `INSTA_UPDATE=no cargo test` (snapshots committados, zero pending)
-- [ ] E2E smoke test completo passa (tmux)
-- [ ] Binário instalável via `cargo install --path .`
-- [ ] Release workflow `.github/workflows/release.yml` actionlint passa
-- [ ] Homebrew formula `packaging/homebrew/martins.rb` tem sintaxe Ruby válida
-- [ ] README descreve instalação (cargo install + Homebrew após primeiro release)
-- [ ] F1-F4 todos APPROVE
-- [ ] Usuário deu okay explícito
+- [x] E2E smoke test completo passa (tmux)
+- [x] Binário instalável via `cargo install --path .`
+- [x] Release workflow `.github/workflows/release.yml` actionlint passa
+- [x] Homebrew formula `packaging/homebrew/martins.rb` tem sintaxe Ruby válida
+- [x] README descreve instalação (cargo install + Homebrew após primeiro release)
+- [x] F1-F4 todos APPROVE
+- [x] Usuário deu okay explícito
