@@ -249,7 +249,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
 ### Wave 1 — Foundation (T1-T7, paralelizáveis)
 
-- [ ] 1. **Cargo project skeleton + pinned dependencies + CI**
+- [x] 1. **Cargo project skeleton + pinned dependencies + CI**
 
   **What to do**:
   - Criar `Cargo.toml` com `[package]` name="martins", edition="2024", rust-version="1.85"
@@ -340,7 +340,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `chore(init): cargo project skeleton with pinned dependencies`
 
-- [ ] 2. **Module layout + base types (no impl)**
+- [x] 2. **Module layout + base types (no impl)**
 
   **What to do**:
   - Criar arquivos vazios com apenas doc comment + `pub` statements stub:
@@ -412,7 +412,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(core): define module layout and base types`
 
-- [ ] 3. **MPB artist list + name generator (pure function, deterministic)**
+- [x] 3. **MPB artist list + name generator (pure function, deterministic)**
 
   **What to do**:
   - Em `src/mpb.rs`: `const ARTISTS: &[&str; 50]` com os 50 nomes EXATOS abaixo (autoridade única — não consultar fontes externas):
@@ -505,7 +505,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(mpb): add brazilian mpb artist names and generator`
 
-- [ ] 4. **State schema + atomic persistence**
+- [x] 4. **State schema + atomic persistence**
 
   **What to do**:
   - Em `src/state.rs`:
@@ -586,7 +586,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(state): schema v1 + atomic persistence`
 
-- [ ] 5. **Config paths + XDG fallback**
+- [x] 5. **Config paths + XDG fallback**
 
   **What to do**:
   - Em `src/config.rs`:
@@ -647,7 +647,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(config): resolve per-repo and xdg paths`
 
-- [ ] 6. **Pre-flight binary detection + install command mapping**
+- [x] 6. **Pre-flight binary detection + install command mapping**
 
   **What to do**:
   - Em `src/tools.rs`:
@@ -730,7 +730,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(tools): pre-flight binary detection and install command mapping`
 
-- [ ] 7. **Logging / tracing setup**
+- [x] 7. **Logging / tracing setup**
 
   **What to do**:
   - Em `src/main.rs`: init `tracing_subscriber` com `EnvFilter::from_default_env()`
@@ -802,7 +802,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
 ### Wave 2 — Domain + Infrastructure (T8-T14, paralelizáveis)
 
-- [ ] 8. **Input modes Normal/Terminal + keymap registry (foundation)**
+- [x] 8. **Input modes Normal/Terminal + keymap registry (foundation)**
 
   **What to do**:
   - Em `src/keys.rs`:
@@ -877,7 +877,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(keys): normal/terminal input modes with keymap registry`
 
-- [ ] 9. **Git repo ops: open, discover, HEAD, base branch capture**
+- [x] 9. **Git repo ops: open, discover, HEAD, base branch capture**
 
   **What to do**:
   - Em `src/git/repo.rs`:
@@ -952,7 +952,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(git): repo discovery and base branch capture`
 
-- [ ] 10. **Git worktree CRUD via git2**
+- [x] 10. **Git worktree CRUD via git2**
 
   **What to do**:
   - Em `src/git/worktree.rs`:
@@ -1047,7 +1047,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(git): worktree crud via git2`
 
-- [ ] 11. **PTY session lifecycle: spawn, read loop, EOF, resize, kill**
+- [x] 11. **PTY session lifecycle: spawn, read loop, EOF, resize, kill**
 
   **What to do**:
   - Em `src/pty/session.rs`:
@@ -1137,7 +1137,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(pty): session lifecycle with eof detection and resize`
 
-- [ ] 12. **File watcher: notify + debouncer with filter**
+- [x] 12. **File watcher: notify + debouncer with filter**
 
   **What to do**:
   - Em `src/watcher.rs`:
@@ -1212,7 +1212,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(watcher): file events with debouncer and filters`
 
-- [ ] 13. **Git diff vs base branch — modified file list**
+- [x] 13. **Git diff vs base branch — modified file list**
 
   **What to do**:
   - Em `src/git/diff.rs`:
@@ -1291,7 +1291,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(git): diff vs base branch with file status list`
 
-- [ ] 14. **.gitignore auto-edit + first-run bootstrap**
+- [x] 14. **.gitignore auto-edit + first-run bootstrap**
 
   **What to do**:
   - Em `src/config.rs` (expand):
@@ -1374,7 +1374,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 >
 > Se algum estado não estiver no UI-SPEC, PARE e levante a questão — não improvise.
 
-- [ ] 15. **Responsive 3-pane layout (collapse sidebars ≤120/≤100/<80)**
+- [x] 15. **Responsive 3-pane layout (collapse sidebars ≤120/≤100/<80)**
 
   **What to do**:
   - Em `src/ui/layout.rs`:
@@ -1445,7 +1445,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(ui): responsive 3-pane layout with collapse thresholds`
 
-- [ ] 16. **Sidebar left: workspaces tree + archived section (single-repo MVP)**
+- [x] 16. **Sidebar left: workspaces tree + archived section (single-repo MVP)**
 
   **What to do**:
   - Em `src/ui/sidebar_left.rs`:
@@ -1528,7 +1528,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(ui): left sidebar with workspace tree and archived section`
 
-- [ ] 17. **Sidebar right: modified files with status icons**
+- [x] 17. **Sidebar right: modified files with status icons**
 
   **What to do**:
   - Em `src/ui/sidebar_right.rs`:
@@ -1603,7 +1603,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(ui): right sidebar with modified files list`
 
-- [ ] 18. **Terminal pane: tui-term PseudoTerminal wrapper + tabs**
+- [x] 18. **Terminal pane: tui-term PseudoTerminal wrapper + tabs**
 
   **What to do**:
   - Em `src/ui/terminal.rs`:
@@ -1697,7 +1697,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(ui): embedded terminal pane with tabs and mode indicator`
 
-- [ ] 19. **Modal system: new workspace, confirm delete, install binaries**
+- [x] 19. **Modal system: new workspace, confirm delete, install binaries**
 
   **What to do**:
   - Em `src/ui/modal.rs`:
@@ -1781,7 +1781,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(ui): modals for create delete and install-missing`
 
-- [ ] 20. **Fuzzy picker: workspaces + modified files**
+- [x] 20. **Fuzzy picker: workspaces + modified files**
 
   **What to do**:
   - Em `src/ui/picker.rs` (usa `nucleo-matcher`, já em deps de T1):
@@ -1860,7 +1860,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(ui): fuzzy picker for workspaces and files`
 
-- [ ] 21. **Bat preview overlay + $EDITOR spawn**
+- [x] 21. **Bat preview overlay + $EDITOR spawn**
 
   **What to do**:
   - Em `src/ui/preview.rs`:
@@ -1977,7 +1977,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
 ### Wave 4 — Integration + Polish + Distribution (T22-T26)
 
-- [ ] 22. **Main event loop: async multiplex + graceful shutdown**
+- [x] 22. **Main event loop: async multiplex + graceful shutdown**
 
   **What to do**:
   - Em `src/app.rs`:
@@ -2112,7 +2112,7 @@ Max Concurrent: 7 (Wave 1 & 2)
 
   **Commit**: YES — `feat(app): main event loop with graceful shutdown`
 
-- [ ] 23. **Agent selection + pre-flight at creation time**
+- [x] 23. **Agent selection + pre-flight at creation time**
 
   **What to do**:
   - Em `src/agents.rs`:

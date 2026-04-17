@@ -97,3 +97,73 @@
 - ensure_gitignore() already in config.rs from T5
 - GitignoreAction: Created/Appended/NoChange
 - All config tests pass
+
+## [T15] Responsive layout implemented
+- compute(): breakpoints at 80/100/120 cols
+- show_left forced false at <100, show_right forced false at <120
+- sidebar_w = clamp(20, 30, 20% of frame)
+- status_bar: always 1 row at bottom
+- theme.rs: all design tokens as Color::Rgb constants
+- All 5 tests pass
+
+## [T16] Left sidebar implemented
+- render(): ratatui List widget with ListState for scrolling
+- Status icons: ● ○ ◐ ⋯ with correct colors from theme
+- Archived section with ▼ header and indented items
+- Empty state: "No workspaces. Press 'n' to create one."
+- TestBackend used for unit tests (no snapshot files needed for MVP)
+- All 2 tests pass
+
+## [T17] Right sidebar implemented
+- render(): List widget with status icons M/A/D/R/?
+- truncate_path(): prefix "..." for paths > max_width
+- Empty state: "No changes."
+- All 3 tests pass
+
+## [T19] Modal system implemented
+- Modal enum: None/NewWorkspace/ConfirmDelete/InstallMissing
+- centered_rect(): percentage-based centering with Clear widget
+- render(): dispatches to sub-renderers
+- ConfirmDelete: red border + ⚠ warning when unpushed_commits > 0
+- All 3 tests pass
+
+## [T20] Fuzzy picker implemented
+- Picker::new(): initializes with all items visible
+- update_filter(): nucleo Pattern::parse + score, top 20 results
+- on_key(): char→append+filter, Backspace→pop+filter, Down/Up→navigate, Enter→Selected, Esc→Cancelled
+- render(): 3-section layout (input/list/footer), 60%×50% centered
+- All 4 tests pass
+
+## [T18] Terminal pane + PtyManager implemented
+- PtyManager: HashMap<(WorkspaceId, TabId), PtySession>, max 5 tabs enforced
+- render(): tab bar (1 row) + PseudoTerminal widget from tui-term
+- Border color: gold=Normal, sage=Terminal mode
+- try_read() on parser to avoid blocking render
+- All 4 tests pass (2 manager + 2 terminal)
+
+## [T21] Bat preview + editor spawn implemented
+- bat_preview(): runs bat --color=never, falls back to fs::read_to_string
+- render_preview(): 80%×80% centered overlay with Clear widget
+- open_in_editor(): disable_raw_mode + LeaveAlternateScreen before spawn
+- Caller must re-enter raw mode after open_in_editor() returns
+- All 4 tests pass
+
+## [T22] Main event loop implemented
+- App::new(): discovers repo, loads state, gets base branch
+- run(): tokio::select! on EventStream + 5s refresh tick
+- draw(): dispatches to all UI panes, overlays modal/picker/preview
+- handle_key(): picker → modal → terminal → normal mode priority
+- dispatch_action(): Quit, navigation, mode switch, sidebar toggle, fuzzy, archive
+- ratatui::init() / ratatui::restore() for terminal setup/teardown
+- cargo build succeeds, binary launches
+
+## [T23] Agent detection + workspace creation implemented
+- detect_agents(): checks Opencode/Claude/Codex via which::which
+- default_agent(): first available or Opencode fallback
+- create_workspace_entry(): validates name via mpb::validate, generates if empty
+- Workspace status starts as Inactive (not Active — PTY not spawned yet)
+- All 5 tests pass
+
+## [T24] README written
+- Covers: features, requirements, install (brew/cargo/source), usage, keybindings, state, dev
+- Homebrew tap: bayma/martins (placeholder for T26)
