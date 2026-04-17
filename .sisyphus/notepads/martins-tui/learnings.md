@@ -92,3 +92,8 @@
 - Sort: untracked first, then alphabetical
 - DiffError::BaseBranchMissing when branch not found
 - All 3 tests pass
+
+## [T14] .gitignore bootstrap verified
+- ensure_gitignore() already in config.rs from T5
+- GitignoreAction: Created/Appended/NoChange
+- All config tests pass

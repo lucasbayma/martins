@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running unittests src/main.rs (target/debug/deps/martins-19e2720fcf8cd205)
+
+running 5 tests
+test config::tests::ensure_gitignore_create ... ok
+test config::tests::writable_repo_uses_local ... ok
+test config::tests::hash_is_deterministic ... ok
+test config::tests::ensure_gitignore_noop ... ok
+test config::tests::ensure_gitignore_append ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.00s
+
