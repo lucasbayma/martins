@@ -1,0 +1,16 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on artifact directory
+   Compiling martins v0.1.0 (/Users/bayma/dev/lucas/martins)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.06s
+     Running unittests src/main.rs (target/debug/deps/martins-19e2720fcf8cd205)
+
+running 3 tests
+test git::diff::tests::empty_diff ... ok
+test git::diff::tests::missing_base_branch ... ok
+test git::diff::tests::full_coverage ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.09s
+
