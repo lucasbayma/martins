@@ -1,0 +1,15 @@
+   Compiling martins v0.1.0 (/Users/bayma/dev/lucas/martins)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.49s
+     Running unittests src/main.rs (target/debug/deps/martins-19e2720fcf8cd205)
+
+running 7 tests
+test mpb::tests::artist_count ... ok
+test mpb::tests::generate_empty_set ... ok
+test mpb::tests::generate_all_used_returns_suffix ... ok
+test mpb::tests::validate_cases ... ok
+test mpb::tests::all_artists_valid ... ok
+test mpb::tests::normalize_accents ... ok
+test mpb::tests::collision_handling ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

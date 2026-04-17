@@ -1,0 +1,38 @@
+F4 Scope Fidelity Check — APPROVE
+
+All 26 implementation tasks have corresponding commits:
+T1: chore(init): cargo project skeleton with pinned dependencies ✓
+T2: feat(core): define module layout and base types ✓
+T3: feat(mpb): add brazilian mpb artist names and generator ✓
+T4: feat(state): schema v1 + atomic persistence ✓
+T5: feat(config): resolve per-repo and xdg paths ✓
+T6: feat(tools): pre-flight binary detection and install command mapping ✓
+T7: chore(log): tracing setup with file rotation and panic hook ✓
+T8: feat(keys): normal/terminal input modes with keymap registry ✓
+T9: feat(git): repo discovery and base branch capture ✓
+T10: feat(git): worktree crud via git2 ✓
+T11: feat(pty): session lifecycle with eof detection and resize ✓
+T12: feat(watcher): file events with debouncer and filters ✓
+T13: feat(git): diff vs base branch with file status list ✓
+T14: feat(bootstrap): auto-gitignore .martins/ on first run ✓
+T15: feat(ui): responsive 3-pane layout with collapse thresholds ✓
+T16: feat(ui): left sidebar with workspace tree and archived section ✓
+T17: feat(ui): right sidebar with modified files list ✓
+T18: feat(ui): embedded terminal pane with tabs and mode indicator ✓
+T19: feat(ui): modals for create delete and install-missing ✓
+T20: feat(ui): fuzzy picker for workspaces and files ✓
+T21: feat(ui): bat preview overlay and editor spawn ✓
+T22: feat(app): main event loop with graceful shutdown ✓
+T23: feat(agents): agent detection and workspace creation flow ✓
+T24: docs: add README with install and usage instructions ✓
+T25: ci: release workflow for cross-platform binaries ✓
+T26: ci: homebrew formula and tap update workflow ✓
+
+Forbidden v2 features: NONE FOUND
+- chat UI: CLEAN
+- git writes: CLEAN
+- external APIs: CLEAN
+- terminal splits: CLEAN
+
+Note: Commits are on main branch directly (not feature branch).
+Formula path: Formula/martins.rb (plan expected packaging/homebrew/martins.rb — minor naming deviation, functionality identical)

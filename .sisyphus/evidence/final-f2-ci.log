@@ -1,0 +1,5 @@
+cargo build --release: OK (3.8MB binary)
+cargo clippy --all-targets -- -D warnings: OK (0 errors)
+cargo fmt --check: OK (exit 0)
+cargo test: OK (81 passed, 0 failed)
+VERDICT: APPROVE

@@ -1,0 +1,99 @@
+   Compiling martins v0.1.0 (/Users/bayma/dev/lucas/martins)
+warning: unused variable: `h`
+  --> src/ui/layout.rs:39:9
+   |
+39 |     let h = frame_size.height;
+   |         ^ help: if this is intentional, prefix it with an underscore: `_h`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `toggle_left` is never used
+  --> src/ui/layout.rs:17:12
+   |
+12 | impl LayoutState {
+   | ---------------- method in this implementation
+...
+17 |     pub fn toggle_left(&mut self) {
+   |            ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `BG_BASE` is never used
+ --> src/ui/theme.rs:6:11
+  |
+6 | pub const BG_BASE: Color = Color::Rgb(26, 24, 20);
+  |           ^^^^^^^
+
+warning: constant `BG_SURFACE` is never used
+ --> src/ui/theme.rs:7:11
+  |
+7 | pub const BG_SURFACE: Color = Color::Rgb(34, 32, 28);
+  |           ^^^^^^^^^^
+
+warning: constant `BG_SELECTED` is never used
+ --> src/ui/theme.rs:8:11
+  |
+8 | pub const BG_SELECTED: Color = Color::Rgb(42, 38, 33);
+  |           ^^^^^^^^^^^
+
+warning: constant `BORDER_MUTED` is never used
+  --> src/ui/theme.rs:11:11
+   |
+11 | pub const BORDER_MUTED: Color = Color::Rgb(58, 54, 49);
+   |           ^^^^^^^^^^^^
+
+warning: constant `TEXT_PRIMARY` is never used
+  --> src/ui/theme.rs:14:11
+   |
+14 | pub const TEXT_PRIMARY: Color = Color::Rgb(232, 227, 216);
+   |           ^^^^^^^^^^^^
+
+warning: constant `TEXT_SECONDARY` is never used
+  --> src/ui/theme.rs:15:11
+   |
+15 | pub const TEXT_SECONDARY: Color = Color::Rgb(184, 179, 168);
+   |           ^^^^^^^^^^^^^^
+
+warning: constant `TEXT_MUTED` is never used
+  --> src/ui/theme.rs:16:11
+   |
+16 | pub const TEXT_MUTED: Color = Color::Rgb(138, 132, 122);
+   |           ^^^^^^^^^^
+
+warning: constant `TEXT_DIM` is never used
+  --> src/ui/theme.rs:17:11
+   |
+17 | pub const TEXT_DIM: Color = Color::Rgb(90, 85, 76);
+   |           ^^^^^^^^
+
+warning: constant `ACCENT_GOLD` is never used
+  --> src/ui/theme.rs:20:11
+   |
+20 | pub const ACCENT_GOLD: Color = Color::Rgb(212, 165, 116);
+   |           ^^^^^^^^^^^
+
+warning: constant `ACCENT_SAGE` is never used
+  --> src/ui/theme.rs:21:11
+   |
+21 | pub const ACCENT_SAGE: Color = Color::Rgb(139, 168, 136);
+   |           ^^^^^^^^^^^
+
+warning: constant `ACCENT_TERRA` is never used
+  --> src/ui/theme.rs:22:11
+   |
+22 | pub const ACCENT_TERRA: Color = Color::Rgb(194, 122, 111);
+   |           ^^^^^^^^^^^^
+
+warning: `martins` (bin "martins" test) generated 13 warnings (run `cargo fix --bin "martins" -p martins --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.50s
+     Running unittests src/main.rs (target/debug/deps/martins-19e2720fcf8cd205)
+
+running 5 tests
+test ui::layout::tests::too_small_70x24 ... ok
+test ui::layout::tests::narrow_layout_85x30 ... ok
+test ui::layout::tests::medium_layout_110x40 ... ok
+test ui::layout::tests::user_toggle_right ... ok
+test ui::layout::tests::full_layout_200x60 ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 50 filtered out; finished in 0.00s
+
