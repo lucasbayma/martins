@@ -87,6 +87,17 @@ pub fn compute(frame_size: Rect, state: &LayoutState) -> PaneRects {
             right: None,
             status_bar,
         }
+    } else if show_right {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Min(1), Constraint::Length(sidebar_w)])
+            .split(content_area);
+        PaneRects {
+            left: None,
+            terminal: chunks[0],
+            right: Some(chunks[1]),
+            status_bar,
+        }
     } else {
         PaneRects {
             left: None,
@@ -160,5 +171,15 @@ mod tests {
         state.toggle_right();
         let panes = compute(rect(200, 60), &state);
         assert!(panes.right.is_some());
+    }
+
+    #[test]
+    fn right_only_layout_150x40() {
+        let mut state = LayoutState::new();
+        state.toggle_left();
+        let panes = compute(rect(150, 40), &state);
+        assert!(panes.left.is_none());
+        assert!(panes.right.is_some());
+        assert!(panes.terminal.width > 0);
     }
 }

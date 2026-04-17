@@ -28,7 +28,17 @@ async fn main() -> Result<()> {
 
     let mut terminal = ratatui::init();
     let result = match app::App::new(repo_root).await {
-        Ok(mut app) => app.run(&mut terminal).await,
+        Ok(mut app) => {
+            let missing = crate::tools::preflight();
+            if !missing.tools.is_empty() {
+                app.modal =
+                    crate::ui::modal::Modal::InstallMissing(crate::ui::modal::InstallForm {
+                        missing_tools: missing.tools,
+                        confirmed: false,
+                    });
+            }
+            app.run(&mut terminal).await
+        }
         Err(error) => Err(error),
     };
 

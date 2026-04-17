@@ -25,6 +25,7 @@ pub struct App {
     pub repo_root: PathBuf,
     pub repo_name: String,
     pub state: AppState,
+    pub watcher: Option<crate::watcher::Watcher>,
     pub layout: LayoutState,
     pub mode: InputMode,
     pub modal: Modal,
@@ -57,6 +58,11 @@ impl App {
             .await
             .unwrap_or_else(|_| "main".to_string());
 
+        let watcher = crate::watcher::Watcher::new().ok().and_then(|mut w| {
+            w.watch(&repo_root).ok()?;
+            Some(w)
+        });
+
         let mut left_list = ListState::default();
         if active_workspace_idx.is_some() {
             left_list.select(Some(1));
@@ -66,6 +72,7 @@ impl App {
             repo_root,
             repo_name,
             state,
+            watcher,
             layout: LayoutState::new(),
             mode: InputMode::Normal,
             modal: Modal::None,
@@ -102,6 +109,16 @@ impl App {
                     self.handle_event(event).await;
                 }
                 _ = refresh_tick.tick() => {
+                    self.refresh_diff().await;
+                }
+                Some(event) = async {
+                    if let Some(w) = &mut self.watcher {
+                        w.next_event().await
+                    } else {
+                        futures::future::pending::<Option<crate::watcher::FsEvent>>().await
+                    }
+                } => {
+                    let _ = event;
                     self.refresh_diff().await;
                 }
             }
@@ -258,7 +275,42 @@ impl App {
         if !matches!(self.modal, Modal::None) {
             match key.code {
                 KeyCode::Esc => self.modal = Modal::None,
-                KeyCode::Enter => self.modal = Modal::None,
+                KeyCode::Enter => match &self.modal.clone() {
+                    crate::ui::modal::Modal::NewWorkspace(form) => {
+                        let name = if form.name_input.is_empty() {
+                            None
+                        } else {
+                            Some(form.name_input.clone())
+                        };
+                        match crate::agents::create_workspace_entry(
+                            &mut self.state,
+                            name,
+                            form.agent.clone(),
+                            form.base_branch.clone(),
+                            &self.repo_root,
+                        ) {
+                            Ok(_) => {
+                                self.save_state();
+                                self.modal = crate::ui::modal::Modal::None;
+                            }
+                            Err(e) => {
+                                if let crate::ui::modal::Modal::NewWorkspace(ref mut f) = self.modal
+                                {
+                                    f.error = Some(e.to_string());
+                                }
+                            }
+                        }
+                    }
+                    crate::ui::modal::Modal::ConfirmDelete(form) => {
+                        let name = form.workspace_name.clone();
+                        self.state.remove(&name);
+                        self.save_state();
+                        self.modal = crate::ui::modal::Modal::None;
+                    }
+                    _ => {
+                        self.modal = crate::ui::modal::Modal::None;
+                    }
+                },
                 _ => {}
             }
             return;
@@ -341,6 +393,41 @@ impl App {
                     let full_path = self.repo_root.join(&entry.path);
                     let lines = preview::bat_preview(&full_path, 200);
                     self.preview_lines = Some((full_path, lines));
+                }
+            }
+            Action::Edit => {
+                if let Some(idx) = self.right_list.selected() {
+                    if let Some(entry) = self.modified_files.get(idx) {
+                        let full_path = self.repo_root.join(&entry.path);
+                        let _ = crate::editor::open_in_editor(&full_path);
+                        let _ = crossterm::terminal::enable_raw_mode();
+                        let _ = crossterm::execute!(
+                            std::io::stdout(),
+                            crossterm::terminal::EnterAlternateScreen
+                        );
+                    }
+                }
+            }
+            Action::UnarchiveWorkspace => {
+                if let Some(idx) = self.left_list.selected() {
+                    let archived: Vec<_> = self.state.archived().map(|w| w.name.clone()).collect();
+                    if let Some(name) = archived.get(idx) {
+                        self.state.unarchive(name);
+                        self.save_state();
+                    }
+                }
+            }
+            Action::DeleteWorkspace => {
+                if let Some(idx) = self.left_list.selected() {
+                    let active: Vec<_> = self.state.active().map(|w| w.name.clone()).collect();
+                    if let Some(name) = active.get(idx) {
+                        self.modal =
+                            crate::ui::modal::Modal::ConfirmDelete(crate::ui::modal::DeleteForm {
+                                workspace_name: name.clone(),
+                                unpushed_commits: 0,
+                                delete_branch: false,
+                            });
+                    }
                 }
             }
             _ => {}
