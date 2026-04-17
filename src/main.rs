@@ -13,8 +13,25 @@ mod tools;
 mod ui;
 mod watcher;
 
-fn main() {
-    let _ = logging::init_logging(std::path::Path::new("logs"));
+use anyhow::Result;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let repo_root = crate::git::repo::discover(&cwd).unwrap_or_else(|_| cwd.clone());
+
+    let log_dir = repo_root.join(".martins").join("logs");
+    let _ = logging::init_logging(&log_dir);
     logging::install_panic_hook();
-    tracing::info!("martins {}", env!("CARGO_PKG_VERSION"));
+
+    let _ = config::ensure_gitignore(&repo_root);
+
+    let mut terminal = ratatui::init();
+    let result = match app::App::new(repo_root).await {
+        Ok(mut app) => app.run(&mut terminal).await,
+        Err(error) => Err(error),
+    };
+
+    ratatui::restore();
+    result
 }
