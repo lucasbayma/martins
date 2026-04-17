@@ -5,7 +5,7 @@ mod editor;
 mod error;
 mod git;
 mod keys;
-mod mpb;
+pub mod mpb;
 mod pty;
 mod state;
 mod tools;
