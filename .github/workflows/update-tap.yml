@@ -1,0 +1,20 @@
+name: Update Homebrew Tap
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-tap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Homebrew tap
+        uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: martins
+          formula-path: Formula/martins.rb
+          homebrew-tap: bayma/homebrew-martins
+          tag-name: ${{ github.ref_name }}
+          download-url: https://github.com/bayma/martins/releases/download/${{ github.ref_name }}/martins-macos-universal
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
