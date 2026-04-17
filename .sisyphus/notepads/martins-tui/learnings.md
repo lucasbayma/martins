@@ -167,3 +167,32 @@
 ## [T24] README written
 - Covers: features, requirements, install (brew/cargo/source), usage, keybindings, state, dev
 - Homebrew tap: bayma/martins (placeholder for T26)
+
+## [T25] Release CI implemented
+- Triggers on v* tags
+- macOS: builds x86_64 + aarch64, lipo'd into universal binary
+- Linux: x86_64 only
+- Creates draft release with generate_release_notes: true
+- Uses softprops/action-gh-release@v2
+
+## [T26] Homebrew formula + tap update CI
+- Formula/martins.rb: on_macos/on_linux blocks, placeholder sha256
+- update-tap.yml: triggers on release published, uses mislav/bump-homebrew-formula-action@v3
+- SHA256 placeholders (zeros) — real hashes filled by CI after first release
+
+- 2026-04-17 F1 verification: cargo build succeeded, cargo test reported 80 passed/0 failed, cargo clippy --all-targets -- -D warnings returned clean. Verified required modules exist and exceed 10 lines; confirmed atomic state save, vt100 parser guarded by Arc<RwLock>, responsive layout thresholds 80/100/120, tokio::select! main loop, double-Esc 300ms detector, CI workflows, and README keybindings table.
+
+## [F1/F3 Fixes] Final wave fixes
+- layout.rs: added right-only branch (show_right && !show_left)
+- state.rs: chmod 0o600 on state.json after atomic rename (unix only)
+- app.rs: Edit/UnarchiveWorkspace/DeleteWorkspace actions added
+- app.rs: Modal::NewWorkspace Enter now calls agents::create_workspace_entry()
+- app.rs: ConfirmDelete Enter now calls state.remove()
+- app.rs: Watcher integrated in tokio::select! loop
+- main.rs: preflight() called at startup, InstallMissing modal shown if tools missing
+
+- 2026-04-17 F1 re-verification after commit 2107aec: confirmed right-only layout branch in src/ui/layout.rs, unix-only chmod 0o600 after state.json rename in src/state.rs, watcher branch in app run loop tokio::select!, modal Enter path calling agents::create_workspace_entry(), dispatch_action arms for Edit/UnarchiveWorkspace/DeleteWorkspace, and startup preflight + InstallMissing modal in src/main.rs.
+## [F3 Fix] Homebrew formula simplified
+- Formula now macOS-only (single url/sha256) — standard tap pattern
+- Linux users: cargo install martins
+- mislav/bump-homebrew-formula-action@v3 can now auto-update the single sha256

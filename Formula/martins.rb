@@ -3,19 +3,11 @@ class Martins < Formula
   homepage "https://github.com/bayma/martins"
   version "0.1.0"
 
-  on_macos do
-    url "https://github.com/bayma/martins/releases/download/v#{version}/martins-macos-universal"
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-  end
-
-  on_linux do
-    url "https://github.com/bayma/martins/releases/download/v#{version}/martins-linux-x86_64"
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-  end
+  url "https://github.com/bayma/martins/releases/download/v#{version}/martins-macos-universal"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
 
   def install
-    bin.install "martins-macos-universal" => "martins" if OS.mac?
-    bin.install "martins-linux-x86_64" => "martins" if OS.linux?
+    bin.install "martins-macos-universal" => "martins"
   end
 
   test do
