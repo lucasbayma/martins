@@ -1,0 +1,16 @@
+   Compiling martins v0.1.0 (/Users/bayma/dev/lucas/martins)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.97s
+     Running unittests src/main.rs (target/debug/deps/martins-19e2720fcf8cd205)
+
+running 6 tests
+test git::repo::tests::discover_non_repo ... ok
+test git::repo::tests::is_bare_false_for_normal ... ok
+test git::repo::tests::current_branch_normal ... ok
+test git::repo::tests::discover_nested ... ok
+test git::repo::tests::detached_head_returns_hash ... ok
+Preparing worktree (new branch 'wt-branch')
+HEAD is now at 7365709 init
+test git::repo::tests::worktree_main_repo ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.06s
+
