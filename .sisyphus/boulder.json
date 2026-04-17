@@ -2,5 +2,9 @@
   "active_plan": "/Users/bayma/dev/lucas/martins/.sisyphus/plans/martins-tui.md",
   "started_at": "2026-04-17T16:06:15.342Z",
   "session_ids": ["ses_263ce9e25ffe9EUI4kW26yR3Bk"],
-  "plan_name": "martins-tui"
+  "plan_name": "martins-tui",
+  "completed_tasks": ["T1", "T2", "T3", "T4", "T5"],
+  "next_tasks": ["T6", "T7"],
+  "wave": 1,
+  "notes": "Wave 1 in progress. T1-T5 done (checkboxes marked in plan). T6 (pre-flight, needs T1+T5) and T7 (logging, needs T1) remain. After Wave 1 complete, start Wave 2: T8-T14 in parallel."
 }
