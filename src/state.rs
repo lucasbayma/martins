@@ -14,8 +14,9 @@ pub enum WorkspaceStatus {
     Exited(i32),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum Agent {
+    #[default]
     Opencode,
     Claude,
     Codex,
