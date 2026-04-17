@@ -13,7 +13,10 @@ pub struct LayoutState {
 #[allow(dead_code)]
 impl LayoutState {
     pub fn new() -> Self {
-        Self { show_left: true, show_right: true }
+        Self {
+            show_left: true,
+            show_right: true,
+        }
     }
 
     pub fn toggle_left(&mut self) {
@@ -49,10 +52,7 @@ pub fn compute(frame_size: Rect, state: &LayoutState) -> PaneRects {
     // Split frame into content + status bar (1 row)
     let vertical = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(1),
-            Constraint::Length(1),
-        ])
+        .constraints([Constraint::Min(1), Constraint::Length(1)])
         .split(frame_size);
 
     let content_area = vertical[0];
@@ -79,10 +79,7 @@ pub fn compute(frame_size: Rect, state: &LayoutState) -> PaneRects {
     } else if show_left {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(sidebar_w),
-                Constraint::Min(1),
-            ])
+            .constraints([Constraint::Length(sidebar_w), Constraint::Min(1)])
             .split(content_area);
         PaneRects {
             left: Some(chunks[0]),

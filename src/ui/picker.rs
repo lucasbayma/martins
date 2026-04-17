@@ -5,15 +5,15 @@
 use crate::ui::theme;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use nucleo_matcher::{
-    pattern::{CaseMatching, Normalization, Pattern},
     Config, Matcher,
+    pattern::{CaseMatching, Normalization, Pattern},
 };
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
-    Frame,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,13 +60,14 @@ impl Picker {
         let mut matcher = Matcher::new(Config::DEFAULT);
         let pattern = Pattern::parse(&self.input, CaseMatching::Ignore, Normalization::Smart);
 
-        let mut scored: Vec<(usize, u32)> = self.items.iter().enumerate()
+        let mut scored: Vec<(usize, u32)> = self
+            .items
+            .iter()
+            .enumerate()
             .filter_map(|(i, item)| {
                 let mut buf = Vec::new();
-                let score = pattern.score(
-                    nucleo_matcher::Utf32Str::new(item, &mut buf),
-                    &mut matcher,
-                );
+                let score =
+                    pattern.score(nucleo_matcher::Utf32Str::new(item, &mut buf), &mut matcher);
                 score.map(|s| (i, s))
             })
             .collect();
@@ -151,23 +152,32 @@ pub fn render(frame: &mut Frame, picker: &Picker) {
         PickerKind::ModifiedFiles => "FILE",
     };
 
-    let items: Vec<ListItem> = picker.filtered.iter().enumerate().map(|(display_idx, &item_idx)| {
-        let name = &picker.items[item_idx];
-        let style = if display_idx == picker.selected {
-            Style::default().bg(theme::BG_SELECTED).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(theme::TEXT_SECONDARY)
-        };
-        ListItem::new(Line::from(vec![
-            Span::styled(kind_label, Style::default().fg(theme::TEXT_MUTED)),
-            Span::raw(" "),
-            Span::styled(name.clone(), style),
-        ]))
-    }).collect();
+    let items: Vec<ListItem> = picker
+        .filtered
+        .iter()
+        .enumerate()
+        .map(|(display_idx, &item_idx)| {
+            let name = &picker.items[item_idx];
+            let style = if display_idx == picker.selected {
+                Style::default()
+                    .bg(theme::BG_SELECTED)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(theme::TEXT_SECONDARY)
+            };
+            ListItem::new(Line::from(vec![
+                Span::styled(kind_label, Style::default().fg(theme::TEXT_MUTED)),
+                Span::raw(" "),
+                Span::styled(name.clone(), style),
+            ]))
+        })
+        .collect();
 
-    let list = List::new(items)
-        .block(Block::default().borders(Borders::LEFT | Borders::RIGHT)
-            .border_style(Style::default().fg(theme::BORDER_MUTED)));
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::LEFT | Borders::RIGHT)
+            .border_style(Style::default().fg(theme::BORDER_MUTED)),
+    );
     frame.render_widget(list, chunks[1]);
 
     // Footer
@@ -184,7 +194,7 @@ pub fn render(frame: &mut Frame, picker: &Picker) {
 mod tests {
     use super::*;
     use crossterm::event::KeyModifiers;
-    use ratatui::{backend::TestBackend, Terminal};
+    use ratatui::{Terminal, backend::TestBackend};
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
@@ -193,15 +203,20 @@ mod tests {
     #[test]
     fn fuzzy_filter() {
         let items: Vec<String> = vec![
-            "caetano".to_string(), "gil".to_string(), "elis".to_string(),
-            "chico".to_string(), "caetano-2".to_string(),
+            "caetano".to_string(),
+            "gil".to_string(),
+            "elis".to_string(),
+            "chico".to_string(),
+            "caetano-2".to_string(),
         ];
         let mut picker = Picker::new(items, PickerKind::Workspaces);
         picker.input = "cae".to_string();
         picker.update_filter();
         assert!(!picker.filtered.is_empty());
         // caetano should be in results
-        let names: Vec<&str> = picker.filtered.iter()
+        let names: Vec<&str> = picker
+            .filtered
+            .iter()
             .map(|&i| picker.items[i].as_str())
             .collect();
         assert!(names.iter().any(|n| n.contains("caetano")));
