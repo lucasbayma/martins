@@ -18,7 +18,14 @@ use anyhow::Result;
 #[tokio::main]
 async fn main() -> Result<()> {
     let cwd = std::env::current_dir()?;
-    let repo_root = crate::git::repo::discover(&cwd).unwrap_or_else(|_| cwd.clone());
+    let repo_root = match crate::git::repo::discover(&cwd) {
+        Ok(root) => root,
+        Err(_) => {
+            eprintln!("error: martins must be run from inside a git repository");
+            eprintln!("hint: run `git init` to create a new repository here");
+            std::process::exit(2);
+        }
+    };
 
     let log_dir = repo_root.join(".martins").join("logs");
     let _ = logging::init_logging(&log_dir);
