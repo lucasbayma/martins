@@ -1,0 +1,16 @@
+    Blocking waiting for file lock on package cache
+   Compiling martins v0.1.0 (/Users/bayma/dev/lucas/martins)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.31s
+     Running unittests src/main.rs (target/debug/deps/martins-19e2720fcf8cd205)
+
+running 7 tests
+test keys::tests::ctrl_b_exits_terminal ... ok
+test keys::tests::terminal_mode_forwards ... ok
+test keys::tests::double_esc_exits_within_300ms ... ok
+test keys::tests::normal_mode_mappings ... ok
+test keys::tests::number_keys_switch_tabs ... ok
+test keys::tests::ctrl_q_quits ... ok
+test keys::tests::single_esc_does_not_exit ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.40s
+
