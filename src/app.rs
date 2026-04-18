@@ -1604,6 +1604,7 @@ impl App {
             )
             .map_err(|error| error.to_string())?;
 
+        self.mode = InputMode::Terminal;
         self.save_state();
         Ok(())
     }
