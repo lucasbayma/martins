@@ -521,41 +521,31 @@ impl App {
 
         if in_terminal {
             match mouse.kind {
-                MouseEventKind::Down(MouseButton::Left) => {
+                MouseEventKind::Drag(MouseButton::Left) => {
                     let inner = terminal_content_rect(self.last_panes.as_ref().unwrap().terminal);
-                    let col = mouse.column.saturating_sub(inner.x);
-                    let row = mouse.row.saturating_sub(inner.y);
-                    self.selection = Some(SelectionState {
-                        start_col: col,
-                        start_row: row,
-                        end_col: col,
-                        end_row: row,
-                        dragging: true,
-                    });
+                    let col = mouse.column.saturating_sub(inner.x).min(inner.width.saturating_sub(1));
+                    let row = mouse.row.saturating_sub(inner.y).min(inner.height.saturating_sub(1));
+                    if let Some(sel) = &mut self.selection {
+                        sel.end_col = col;
+                        sel.end_row = row;
+                    } else {
+                        self.selection = Some(SelectionState {
+                            start_col: col,
+                            start_row: row,
+                            end_col: col,
+                            end_row: row,
+                            dragging: true,
+                        });
+                    }
                     return;
                 }
-                MouseEventKind::Drag(MouseButton::Left) => {
-                    if let Some(sel) = &mut self.selection {
-                        if sel.dragging {
-                            let inner = terminal_content_rect(self.last_panes.as_ref().unwrap().terminal);
-                            sel.end_col = mouse.column.saturating_sub(inner.x).min(inner.width.saturating_sub(1));
-                            sel.end_row = mouse.row.saturating_sub(inner.y).min(inner.height.saturating_sub(1));
+                MouseEventKind::Up(MouseButton::Left) => {
+                    if let Some(sel) = self.selection.take() {
+                        if !sel.is_empty() {
+                            self.selection = Some(sel);
+                            self.copy_selection_to_clipboard();
                             return;
                         }
-                    }
-                }
-                MouseEventKind::Up(MouseButton::Left) => {
-                    if let Some(sel) = &mut self.selection {
-                        sel.dragging = false;
-                        if !sel.is_empty() {
-                            self.copy_selection_to_clipboard();
-                        } else {
-                            self.selection = None;
-                            if self.mode != InputMode::Terminal {
-                                self.mode = InputMode::Terminal;
-                            }
-                        }
-                        return;
                     }
                 }
                 _ => {}
@@ -645,6 +635,17 @@ impl App {
                     return;
                 }
             }
+
+            let inner = terminal_content_rect(panes.terminal);
+            if rect_contains(inner, col, row) {
+                let local_col = col.saturating_sub(inner.x) + 1;
+                let local_row = row.saturating_sub(inner.y) + 1;
+                let press = format!("\x1b[<0;{local_col};{local_row}M");
+                let release = format!("\x1b[<0;{local_col};{local_row}m");
+                self.write_active_tab_input(press.as_bytes());
+                self.write_active_tab_input(release.as_bytes());
+            }
+
             self.mode = InputMode::Terminal;
             return;
         }

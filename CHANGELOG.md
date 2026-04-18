@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-04-18
+
+### Fixed
+
+- Mouse clicks now work on interactive elements inside the terminal pane (agent buttons, prompts). Click events are forwarded to the PTY as SGR mouse escape sequences. Drag still triggers text selection.
+
 ## [0.3.1] - 2026-04-18
 
 ### Changed
