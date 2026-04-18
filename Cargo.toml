@@ -3,6 +3,12 @@ name = "martins"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
+license = "MIT"
+description = "Terminal workspace manager for AI coding agents"
+repository = "https://github.com/lucasbayma/martins"
+homepage = "https://github.com/lucasbayma/martins"
+keywords = ["tui", "terminal", "ai", "workspace", "tmux"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 ratatui = "0.30"
