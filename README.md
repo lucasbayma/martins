@@ -95,3 +95,11 @@ Once inside:
 - **tmux** — session persistence backend
 - **Git** — worktree and repository management
 - At least one AI agent installed: [OpenCode](https://github.com/nicholaskoerfer/opencode), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), or [Codex](https://github.com/openai/codex)
+
+## Contributing
+
+Contributions are welcome! Check the [Contributing Guide](CONTRIBUTING.md) for setup instructions, project structure, and how to submit a PR.
+
+## License
+
+[MIT](LICENSE)
