@@ -4,6 +4,7 @@
 
 use crate::keys::InputMode;
 use crate::pty::session::PtySession;
+use crate::state::TabSpec;
 use crate::ui::theme;
 use ratatui::{
     Frame,
@@ -15,23 +16,56 @@ use ratatui::{
 use tui_term::widget::PseudoTerminal;
 
 /// Render the terminal pane with tab bar.
+pub struct WorkspaceInfo {
+    pub name: String,
+    pub path: String,
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn render(
     frame: &mut Frame,
     area: Rect,
     sessions: &[(u32, &PtySession)],
+    tab_specs: &[TabSpec],
     active_tab: usize,
     mode: InputMode,
     focused: bool,
+    workspace_info: Option<&WorkspaceInfo>,
 ) {
-    if sessions.is_empty() {
+    if tab_specs.is_empty() {
         let block = Block::default()
             .title(" Terminal ")
             .borders(Borders::ALL)
             .border_style(Style::default().fg(theme::BORDER_MUTED));
-        let paragraph = Paragraph::new("No active workspace. Press 'n' to create one.")
-            .block(block)
-            .style(Style::default().fg(theme::TEXT_MUTED));
 
+        let lines = if let Some(info) = workspace_info {
+            vec![
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("  Workspace: ", Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(
+                        &info.name,
+                        Style::default().fg(theme::TEXT_PRIMARY).add_modifier(Modifier::BOLD),
+                    ),
+                ]),
+                Line::from(vec![
+                    Span::styled("  Path:      ", Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(&info.path, Style::default().fg(theme::TEXT_SECONDARY)),
+                ]),
+                Line::from(""),
+                Line::from(vec![Span::styled(
+                    "  Press 't' or click [+] to open a tab",
+                    Style::default().fg(theme::ACCENT_GOLD),
+                )]),
+            ]
+        } else {
+            vec![Line::from(vec![Span::styled(
+                "  No active workspace. Press 'n' to create one.",
+                Style::default().fg(theme::TEXT_MUTED),
+            )])]
+        };
+
+        let paragraph = Paragraph::new(lines).block(block);
         frame.render_widget(paragraph, area);
         return;
     }
@@ -44,26 +78,33 @@ pub fn render(
     let tab_area = chunks[0];
     let term_area = chunks[1];
 
-    let tab_spans: Vec<Span<'_>> = sessions
+    let tab_spans: Vec<Span<'_>> = tab_specs
         .iter()
         .enumerate()
-        .map(|(index, (tab_id, _))| {
-            let label = format!(" {} ", tab_id);
-
-            if index == active_tab {
-                let color = match mode {
+        .flat_map(|(index, tab_spec)| {
+            let color = if index == active_tab {
+                match mode {
                     InputMode::Normal => theme::ACCENT_GOLD,
                     InputMode::Terminal => theme::ACCENT_SAGE,
-                };
-
-                Span::styled(
-                    label,
-                    Style::default().fg(color).add_modifier(Modifier::BOLD),
-                )
+                }
             } else {
-                Span::styled(label, Style::default().fg(theme::TEXT_MUTED))
-            }
+                theme::TEXT_MUTED
+            };
+            let base_style = if index == active_tab {
+                Style::default().fg(color).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(color)
+            };
+
+            [
+                Span::styled(format!(" {}", tab_spec.command), base_style),
+                Span::styled(" ✕ ", Style::default().fg(theme::TEXT_DIM)),
+            ]
         })
+        .chain(std::iter::once(Span::styled(
+            " [+] ",
+            Style::default().fg(theme::ACCENT_GOLD),
+        )))
         .collect();
 
     let tab_line =
@@ -106,7 +147,7 @@ mod tests {
 
         terminal
             .draw(|frame| {
-                render(frame, frame.area(), &[], 0, InputMode::Normal, false);
+                render(frame, frame.area(), &[], &[], 0, InputMode::Normal, false, None);
             })
             .unwrap();
 
@@ -123,7 +164,7 @@ mod tests {
 
         terminal
             .draw(|frame| {
-                render(frame, frame.area(), &[], 0, InputMode::Terminal, true);
+                render(frame, frame.area(), &[], &[], 0, InputMode::Terminal, true, None);
             })
             .unwrap();
     }

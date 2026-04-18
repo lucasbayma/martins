@@ -1,4 +1,34 @@
+# Build artifacts
 target/
+dist/
+
+# Editor/IDE
 .idea/
+.vscode/
 *.swp
+*.swo
+*~
+
+# Martins runtime state
 .martins/
+
+# Agent/orchestrator working dirs
+.sisyphus/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / env
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.*
+
+# Logs
+*.log
+logs/

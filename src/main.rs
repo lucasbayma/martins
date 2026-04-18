@@ -9,46 +9,55 @@ mod logging;
 pub mod mpb;
 mod pty;
 mod state;
+mod tmux;
 mod tools;
 mod ui;
 mod watcher;
 
 use anyhow::Result;
+use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, execute};
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let cwd = std::env::current_dir()?;
-    let repo_root = match crate::git::repo::discover(&cwd) {
-        Ok(root) => root,
-        Err(_) => {
-            eprintln!("error: martins must be run from inside a git repository");
-            eprintln!("hint: run `git init` to create a new repository here");
-            std::process::exit(2);
-        }
-    };
-
-    let log_dir = repo_root.join(".martins").join("logs");
+    let log_dir = config::global_log_dir();
     let _ = logging::init_logging(&log_dir);
     logging::install_panic_hook();
 
-    let _ = config::ensure_gitignore(&repo_root);
+    let state_path = config::global_state_path();
+    let mut global_state = state::GlobalState::load(&state_path).unwrap_or_default();
+
+    let cwd = std::env::current_dir()?;
+    if let Ok(repo_root) = crate::git::repo::discover(&cwd) {
+        let base_branch = crate::git::repo::current_branch_async(repo_root.clone())
+            .await
+            .unwrap_or_else(|_| "main".to_string());
+        let project_id = global_state.ensure_project(&repo_root, base_branch);
+        let _ = config::ensure_gitignore(&repo_root);
+        if global_state.active_project_id.is_none() {
+            global_state.active_project_id = Some(project_id);
+        }
+    }
+
+    if let Some(path) = std::env::args().nth(1) {
+        let repo_root = crate::git::repo::discover(&PathBuf::from(path))?;
+        let base_branch = crate::git::repo::current_branch_async(repo_root.clone())
+            .await
+            .unwrap_or_else(|_| "main".to_string());
+        let project_id = global_state.ensure_project(&repo_root, base_branch);
+        let _ = config::ensure_gitignore(&repo_root);
+        global_state.active_project_id = Some(project_id);
+    }
 
     let mut terminal = ratatui::init();
-    let result = match app::App::new(repo_root).await {
-        Ok(mut app) => {
-            let missing = crate::tools::preflight();
-            if !missing.tools.is_empty() {
-                app.modal =
-                    crate::ui::modal::Modal::InstallMissing(crate::ui::modal::InstallForm {
-                        missing_tools: missing.tools,
-                        confirmed: false,
-                    });
-            }
-            app.run(&mut terminal).await
-        }
+    execute!(std::io::stdout(), EnableMouseCapture)?;
+
+    let result = match app::App::new(global_state, state_path).await {
+        Ok(mut app) => app.run(&mut terminal).await,
         Err(error) => Err(error),
     };
 
+    let _ = execute!(std::io::stdout(), DisableMouseCapture);
     ratatui::restore();
     result
 }

@@ -37,6 +37,12 @@ pub enum Action {
     ShowHelp,
     Preview,
     Edit,
+    AddProject,
+    ClickProject(usize),
+    ClickWorkspace(usize, usize),
+    ClickTab(usize),
+    ClickFile(usize),
+    ToggleProjectExpand(usize),
 }
 
 pub struct Keymap {

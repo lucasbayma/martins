@@ -1,6 +1,7 @@
-//! Left sidebar: workspace list with status icons.
+//! Left sidebar: project/workspace tree.
 
-use crate::state::{AppState, WorkspaceStatus};
+use crate::app::SidebarItem;
+use crate::state::{GlobalState, WorkspaceStatus};
 use crate::ui::theme;
 use ratatui::{
     Frame,
@@ -10,16 +11,15 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
 };
 
-/// Render the left sidebar.
-#[allow(dead_code)]
 pub fn render(
     frame: &mut Frame,
     area: Rect,
-    state: &AppState,
+    state: &GlobalState,
+    active_project_idx: Option<usize>,
+    active_workspace_idx: Option<usize>,
     list_state: &mut ListState,
     focused: bool,
-    repo_name: &str,
-) {
+) -> Vec<SidebarItem> {
     let border_style = if focused {
         Style::default().fg(theme::ACCENT_GOLD)
     } else {
@@ -27,67 +27,102 @@ pub fn render(
     };
 
     let block = Block::default()
-        .title(format!(" {} ", repo_name))
+        .title(" Projects ")
         .borders(Borders::ALL)
         .border_style(border_style);
 
-    let _inner = block.inner(area);
+    let mut items = Vec::new();
+    let mut sidebar_items = Vec::new();
+    let mut selected_row = None;
 
-    // Build list items
-    let mut items: Vec<ListItem> = Vec::new();
-
-    // Section header
-    items.push(ListItem::new(Line::from(vec![Span::styled(
-        "WORKSPACES",
-        Style::default()
-            .fg(theme::TEXT_MUTED)
-            .add_modifier(Modifier::BOLD),
-    )])));
-
-    // Active/inactive/exited workspaces
-    let active_workspaces: Vec<_> = state.active().collect();
-
-    if active_workspaces.is_empty() && state.archived().count() == 0 {
+    if state.projects.is_empty() {
+        selected_row = Some(0);
         items.push(ListItem::new(Line::from(vec![Span::styled(
-            "No workspaces. Press 'n' to create one.",
+            "No projects. Press 'a' to add one.",
             Style::default().fg(theme::TEXT_MUTED),
         )])));
+        sidebar_items.push(SidebarItem::AddProject);
     } else {
-        for ws in &active_workspaces {
-            let (icon, icon_style) = match &ws.status {
-                WorkspaceStatus::Active => ("●", Style::default().fg(theme::ACCENT_SAGE)),
-                WorkspaceStatus::Inactive => ("○", Style::default().fg(theme::TEXT_MUTED)),
-                WorkspaceStatus::Exited(code) => {
-                    let _ = code;
-                    ("◐", Style::default().fg(theme::ACCENT_TERRA))
-                }
-                WorkspaceStatus::Archived => ("⋯", Style::default().fg(theme::TEXT_DIM)),
+        for (project_idx, project) in state.projects.iter().enumerate() {
+            let is_active_project = active_project_idx == Some(project_idx);
+            let arrow = if project.expanded { "▼" } else { "▶" };
+            let label = if project.expanded {
+                format!("{} {}", arrow, project.name)
+            } else {
+                format!("{} {} ({})", arrow, project.name, project.workspaces.len())
             };
-
-            let name_style = Style::default().fg(theme::TEXT_PRIMARY);
+            let row_width = area.width.saturating_sub(2) as usize;
+            let padding = " ".repeat(row_width.saturating_sub(label.chars().count() + 2));
+            if is_active_project && selected_row.is_none() {
+                selected_row = Some(sidebar_items.len());
+            }
             items.push(ListItem::new(Line::from(vec![
-                Span::styled(icon, icon_style),
-                Span::raw(" "),
-                Span::styled(ws.name.clone(), name_style),
+                Span::styled(
+                    label,
+                    Style::default()
+                        .fg(theme::TEXT_PRIMARY)
+                        .add_modifier(if is_active_project {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        }),
+                ),
+                Span::raw(padding),
+                Span::styled("✕", Style::default().fg(theme::ACCENT_TERRA)),
             ])));
-        }
+            sidebar_items.push(SidebarItem::RemoveProject(project_idx));
 
-        // Archived section
-        let archived: Vec<_> = state.archived().collect();
-        if !archived.is_empty() {
-            items.push(ListItem::new(Line::from(vec![Span::styled(
-                format!("▼ ARCHIVED  {}", archived.len()),
-                Style::default().fg(theme::TEXT_DIM),
-            )])));
-            for ws in &archived {
+            if project.expanded {
+                for (workspace_idx, ws) in project.active().enumerate() {
+                    let (icon, icon_style) = match &ws.status {
+                        WorkspaceStatus::Active => ("●", Style::default().fg(theme::ACCENT_SAGE)),
+                        WorkspaceStatus::Inactive => ("○", Style::default().fg(theme::TEXT_MUTED)),
+                        WorkspaceStatus::Exited(_) => {
+                            ("◐", Style::default().fg(theme::ACCENT_TERRA))
+                        }
+                        WorkspaceStatus::Archived => ("⋯", Style::default().fg(theme::TEXT_DIM)),
+                    };
+                    if is_active_project && active_workspace_idx == Some(workspace_idx) {
+                        selected_row = Some(sidebar_items.len());
+                    }
+                    let inner_w = area.width.saturating_sub(2) as usize;
+                    let left_len = 2 + 1 + 1 + ws.name.len();
+                    let pad = inner_w.saturating_sub(left_len + 1);
+                    items.push(ListItem::new(Line::from(vec![
+                        Span::raw("  "),
+                        Span::styled(icon, icon_style),
+                        Span::raw(" "),
+                        Span::styled(ws.name.clone(), Style::default().fg(theme::TEXT_PRIMARY)),
+                        Span::raw(" ".repeat(pad)),
+                        Span::styled("✕", Style::default().fg(theme::ACCENT_TERRA)),
+                    ])));
+                    sidebar_items.push(SidebarItem::Workspace(project_idx, workspace_idx));
+                }
+
                 items.push(ListItem::new(Line::from(vec![
                     Span::raw("  "),
-                    Span::styled("⋯ ", Style::default().fg(theme::TEXT_DIM)),
-                    Span::styled(ws.name.clone(), Style::default().fg(theme::TEXT_MUTED)),
+                    Span::styled(
+                        "+ new workspace",
+                        Style::default().fg(theme::ACCENT_GOLD),
+                    ),
                 ])));
+                sidebar_items.push(SidebarItem::NewWorkspace(project_idx));
             }
         }
+
+        items.push(ListItem::new(Line::from(vec![Span::styled(
+            "──────────",
+            Style::default().fg(theme::TEXT_DIM),
+        )])));
+        sidebar_items.push(SidebarItem::AddProject);
+        items.push(ListItem::new(Line::from(vec![Span::styled(
+            "+ Add Project",
+            Style::default().fg(theme::ACCENT_GOLD),
+        )])));
+        sidebar_items.push(SidebarItem::AddProject);
     }
+
+    list_state.select(selected_row);
 
     let list = List::new(items).block(block).highlight_style(
         Style::default()
@@ -96,19 +131,20 @@ pub fn render(
     );
 
     frame.render_stateful_widget(list, area, list_state);
+    sidebar_items
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{Agent, AppState, Workspace, WorkspaceStatus};
+    use crate::state::{Agent, GlobalState, Project, Workspace, WorkspaceStatus};
     use ratatui::{Terminal, backend::TestBackend};
     use std::path::PathBuf;
 
     fn make_workspace(name: &str, status: WorkspaceStatus) -> Workspace {
         Workspace {
             name: name.to_string(),
-            worktree_path: PathBuf::from(format!("/tmp/{}", name)),
+            worktree_path: PathBuf::from(format!("/tmp/{name}")),
             base_branch: "main".to_string(),
             agent: Agent::Opencode,
             status,
@@ -117,38 +153,60 @@ mod tests {
         }
     }
 
+    fn make_project(name: &str, expanded: bool) -> Project {
+        let mut project = Project::new(PathBuf::from(format!("/tmp/{name}")), "main".to_string());
+        project.name = name.to_string();
+        project.expanded = expanded;
+        project.add_workspace(make_workspace("caetano", WorkspaceStatus::Active));
+        project.add_workspace(make_workspace("gil", WorkspaceStatus::Inactive));
+        project
+    }
+
     #[test]
-    fn renders_without_panic() {
+    fn renders_project_tree() {
         let backend = TestBackend::new(40, 20);
         let mut terminal = Terminal::new(backend).unwrap();
-        let mut state = AppState::default();
-        state.add_workspace(make_workspace("caetano", WorkspaceStatus::Active));
-        state.add_workspace(make_workspace("gil", WorkspaceStatus::Inactive));
-        state.add_workspace(make_workspace("elis", WorkspaceStatus::Exited(42)));
-        state.archive("elis");
-
+        let mut state = GlobalState::default();
+        state.projects.push(make_project("martins", true));
+        state.projects.push(make_project("api-server", false));
         let mut list_state = ListState::default();
+
         terminal
             .draw(|f| {
-                render(f, f.area(), &state, &mut list_state, true, "myrepo");
+                let items = render(
+                    f,
+                    f.area(),
+                    &state,
+                    Some(0),
+                    Some(0),
+                    &mut list_state,
+                    true,
+                );
+                assert!(!items.is_empty());
             })
             .unwrap();
+
+        let buf = terminal.backend().buffer().clone();
+        let content: String = buf.content().iter().map(|c| c.symbol()).collect();
+        assert!(content.contains("martins"));
+        assert!(content.contains("api-server"));
+        assert!(!content.contains("[opencode]"));
+        assert!(content.contains("✕"));
     }
 
     #[test]
     fn empty_state_renders() {
         let backend = TestBackend::new(40, 20);
         let mut terminal = Terminal::new(backend).unwrap();
-        let state = AppState::default();
+        let state = GlobalState::default();
         let mut list_state = ListState::default();
         terminal
             .draw(|f| {
-                render(f, f.area(), &state, &mut list_state, false, "myrepo");
+                render(f, f.area(), &state, None, None, &mut list_state, false);
             })
             .unwrap();
-        // Verify it rendered something (no panic)
         let buf = terminal.backend().buffer().clone();
         let content: String = buf.content().iter().map(|c| c.symbol()).collect();
-        assert!(content.contains("WORKSPACES") || content.contains("No workspaces"));
+        assert!(content.contains("No projects") || content.contains("Add Project"));
     }
 }

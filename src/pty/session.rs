@@ -7,7 +7,7 @@ use portable_pty::{CommandBuilder, MasterPty, PtySize, native_pty_system};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
-use tokio::sync::oneshot;
+use tokio::sync::{Notify, oneshot};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PtyStatus {
@@ -25,8 +25,18 @@ pub struct PtySession {
 }
 
 impl PtySession {
-    /// Spawn a new PTY session running `program` with `args` in `cwd`.
     pub fn spawn(cwd: PathBuf, program: &str, args: &[&str], rows: u16, cols: u16) -> Result<Self> {
+        Self::spawn_with_notify(cwd, program, args, rows, cols, None)
+    }
+
+    pub fn spawn_with_notify(
+        cwd: PathBuf,
+        program: &str,
+        args: &[&str],
+        rows: u16,
+        cols: u16,
+        output_notify: Option<Arc<Notify>>,
+    ) -> Result<Self> {
         let pty_system = native_pty_system();
         let pair = pty_system.openpty(PtySize {
             rows,
@@ -40,6 +50,7 @@ impl PtySession {
             cmd.arg(arg);
         }
         cmd.cwd(cwd);
+        cmd.env("TERM", "xterm-256color");
 
         let child = pair.slave.spawn_command(cmd)?;
         let master = pair.master;
@@ -75,6 +86,9 @@ impl PtySession {
                     Ok(n) => {
                         if let Ok(mut parser) = parser_clone.write() {
                             parser.process(&buf[..n]);
+                        }
+                        if let Some(notify) = &output_notify {
+                            notify.notify_one();
                         }
                     }
                 }

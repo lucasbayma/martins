@@ -55,10 +55,26 @@ pub async fn list(repo_path: PathBuf) -> Result<Vec<WorktreeInfo>> {
 }
 
 /// Create a new worktree at `{repo_parent}/{repo_name}-{name}` on a new branch.
+fn default_worktree_base() -> PathBuf {
+    std::env::var("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir())
+        .join(".martins")
+}
+
 pub async fn create(
     repo_path: PathBuf,
     name: String,
     base_branch: String,
+) -> Result<PathBuf, WorktreeError> {
+    create_in(repo_path, name, base_branch, None).await
+}
+
+pub async fn create_in(
+    repo_path: PathBuf,
+    name: String,
+    base_branch: String,
+    base_dir: Option<PathBuf>,
 ) -> Result<PathBuf, WorktreeError> {
     crate::mpb::validate(&name).map_err(|e| WorktreeError::InvalidName(e.to_string()))?;
 
@@ -73,14 +89,14 @@ pub async fn create(
             }
         }
 
-        let repo_parent = repo_path
-            .parent()
-            .ok_or_else(|| WorktreeError::Io("repo has no parent dir".to_string()))?;
         let repo_name = repo_path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("repo");
-        let wt_path = repo_parent.join(format!("{}-{}", repo_name, name));
+        let wt_base = base_dir.unwrap_or_else(default_worktree_base);
+        std::fs::create_dir_all(&wt_base)
+            .map_err(|e| WorktreeError::Io(e.to_string()))?;
+        let wt_path = wt_base.join(format!("{}-{}", repo_name, name));
 
         let base_ref = repo
             .find_branch(&base_branch, git2::BranchType::Local)
@@ -201,10 +217,12 @@ mod tests {
             .to_string();
         drop(repo);
 
-        let wt_path = create(
+        let wt_base = tmp.path().join("worktrees");
+        let wt_path = create_in(
             main_path.clone(),
             "caetano".to_string(),
             base_branch.clone(),
+            Some(wt_base),
         )
         .await;
         assert!(wt_path.is_ok(), "create failed: {:?}", wt_path);
@@ -229,10 +247,11 @@ mod tests {
             .to_string();
         drop(repo);
 
-        create(main_path.clone(), "gil".to_string(), base_branch.clone())
+        let wt_base = tmp.path().join("worktrees");
+        create_in(main_path.clone(), "gil".to_string(), base_branch.clone(), Some(wt_base.clone()))
             .await
             .unwrap();
-        let result = create(main_path.clone(), "gil".to_string(), base_branch).await;
+        let result = create_in(main_path.clone(), "gil".to_string(), base_branch, Some(wt_base)).await;
         assert!(matches!(result, Err(WorktreeError::NameExists(_))));
     }
 
@@ -250,7 +269,8 @@ mod tests {
             .to_string();
         drop(repo);
 
-        let wt_path = create(main_path.clone(), "elis".to_string(), base_branch.clone())
+        let wt_base = tmp.path().join("worktrees");
+        let wt_path = create_in(main_path.clone(), "elis".to_string(), base_branch.clone(), Some(wt_base))
             .await
             .unwrap();
 

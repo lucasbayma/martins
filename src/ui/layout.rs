@@ -36,6 +36,7 @@ pub struct PaneRects {
     pub terminal: Rect,
     pub right: Option<Rect>,
     pub status_bar: Rect,
+    pub menu_bar: Rect,
 }
 
 /// Compute pane layout based on frame size and user toggles.
@@ -49,14 +50,19 @@ pub fn compute(frame_size: Rect, state: &LayoutState) -> PaneRects {
     let show_left = w >= 100 && state.show_left;
     let show_right = w >= 120 && state.show_right;
 
-    // Split frame into content + status bar (1 row)
+    // Split frame into content + status bar + menu bar
     let vertical = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Length(1)])
+        .constraints([
+            Constraint::Min(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
         .split(frame_size);
 
     let content_area = vertical[0];
     let status_bar = vertical[1];
+    let menu_bar = vertical[2];
 
     // Sidebar width: min(30, max(20, 20% of frame))
     let sidebar_w = ((w as f32 * 0.20) as u16).clamp(20, 30);
@@ -75,6 +81,7 @@ pub fn compute(frame_size: Rect, state: &LayoutState) -> PaneRects {
             terminal: chunks[1],
             right: Some(chunks[2]),
             status_bar,
+            menu_bar,
         }
     } else if show_left {
         let chunks = Layout::default()
@@ -86,6 +93,7 @@ pub fn compute(frame_size: Rect, state: &LayoutState) -> PaneRects {
             terminal: chunks[1],
             right: None,
             status_bar,
+            menu_bar,
         }
     } else if show_right {
         let chunks = Layout::default()
@@ -97,6 +105,7 @@ pub fn compute(frame_size: Rect, state: &LayoutState) -> PaneRects {
             terminal: chunks[0],
             right: Some(chunks[1]),
             status_bar,
+            menu_bar,
         }
     } else {
         PaneRects {
@@ -104,6 +113,7 @@ pub fn compute(frame_size: Rect, state: &LayoutState) -> PaneRects {
             terminal: content_area,
             right: None,
             status_bar,
+            menu_bar,
         }
     }
 }
@@ -130,6 +140,7 @@ mod tests {
         assert!(panes.right.is_some());
         assert!(panes.terminal.width > 0);
         assert_eq!(panes.status_bar.height, 1);
+        assert_eq!(panes.menu_bar.height, 1);
     }
 
     #[test]

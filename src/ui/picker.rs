@@ -20,6 +20,7 @@ use ratatui::{
 pub enum PickerKind {
     Workspaces,
     ModifiedFiles,
+    NewTab,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -150,6 +151,7 @@ pub fn render(frame: &mut Frame, picker: &Picker) {
     let kind_label = match picker.kind {
         PickerKind::Workspaces => "WS  ",
         PickerKind::ModifiedFiles => "FILE",
+        PickerKind::NewTab => "TAB ",
     };
 
     let items: Vec<ListItem> = picker
