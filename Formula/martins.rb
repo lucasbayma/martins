@@ -5,7 +5,7 @@ class Martins < Formula
   license "MIT"
 
   url "https://github.com/lucasbayma/martins/releases/download/v#{version}/martins-aarch64-apple-darwin.tar.gz"
-  sha256 "d0af768f3f846915d6e35fab727373b66cb0126ad9f7bce066bcc4cf48713897"
+  sha256 "3c3395f8fa1843357bb5eed87916019f0e5efce59d3ab5c95281b8935a2ebb87"
 
   depends_on :macos
   depends_on "tmux"
