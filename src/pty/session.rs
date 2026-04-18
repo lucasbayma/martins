@@ -114,7 +114,10 @@ impl PtySession {
         })
     }
 
-    /// Write bytes to the PTY (forwarded to child stdin).
+    pub fn is_exited(&self) -> bool {
+        matches!(*self.status.lock().unwrap(), PtyStatus::Exited(_))
+    }
+
     pub fn write_input(&mut self, data: &[u8]) -> Result<()> {
         let writer = self
             .writer

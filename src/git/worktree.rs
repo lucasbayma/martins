@@ -60,6 +60,7 @@ fn default_worktree_base() -> PathBuf {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::temp_dir())
         .join(".martins")
+        .join("workspaces")
 }
 
 pub async fn create(
@@ -94,9 +95,10 @@ pub async fn create_in(
             .and_then(|n| n.to_str())
             .unwrap_or("repo");
         let wt_base = base_dir.unwrap_or_else(default_worktree_base);
-        std::fs::create_dir_all(&wt_base)
+        let project_dir = wt_base.join(repo_name);
+        std::fs::create_dir_all(&project_dir)
             .map_err(|e| WorktreeError::Io(e.to_string()))?;
-        let wt_path = wt_base.join(format!("{}-{}", repo_name, name));
+        let wt_path = project_dir.join(&name);
 
         let base_ref = repo
             .find_branch(&base_branch, git2::BranchType::Local)
@@ -228,7 +230,7 @@ mod tests {
         assert!(wt_path.is_ok(), "create failed: {:?}", wt_path);
         let wt_path = wt_path.unwrap();
         assert!(wt_path.exists(), "worktree dir should exist");
-        assert!(wt_path.ends_with("myrepo-caetano"));
+        assert!(wt_path.ends_with("myrepo/caetano"));
     }
 
     #[tokio::test]

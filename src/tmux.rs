@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use anyhow::{Result, bail};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub fn is_available() -> bool {
@@ -21,6 +21,44 @@ pub fn session_exists(name: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn ensure_config() -> PathBuf {
+    let config_path = std::env::var("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir())
+        .join(".martins")
+        .join("tmux.conf");
+
+    let _ = std::fs::create_dir_all(config_path.parent().unwrap());
+    let _ = std::fs::write(
+        &config_path,
+        "set -g mouse on\n\
+         set -g default-terminal \"xterm-256color\"\n\
+         set -g allow-passthrough off\n\
+         set -g escape-time 0\n\
+         setw -g alternate-screen off\n",
+    );
+    config_path
+}
+
+pub fn enforce_session_options(name: &str) {
+    let opts: &[(&[&str], &str, &str)] = &[
+        (&["set-option", "-t"], "mouse", "on"),
+        (&["set-window-option", "-t"], "alternate-screen", "off"),
+        (&["set-option", "-t"], "allow-passthrough", "off"),
+    ];
+    for (cmd, key, val) in opts {
+        let mut args: Vec<&str> = cmd.to_vec();
+        args.push(name);
+        args.push(key);
+        args.push(val);
+        let _ = Command::new("tmux")
+            .args(&args)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+    }
+}
+
 pub fn new_session(
     name: &str,
     cwd: &Path,
@@ -28,16 +66,19 @@ pub fn new_session(
     cols: u16,
     rows: u16,
 ) -> Result<()> {
+    let config = ensure_config();
     let status = Command::new("tmux")
         .args([
+            "-f", &config.to_string_lossy(),
             "new-session",
             "-d",
             "-s", name,
             "-x", &cols.to_string(),
             "-y", &rows.to_string(),
-            program,
         ])
         .current_dir(cwd)
+        .env("TERM", "xterm-256color")
+        .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()?;
 
@@ -45,29 +86,15 @@ pub fn new_session(
         bail!("tmux new-session failed for '{name}'");
     }
 
-    configure_session(name);
-    Ok(())
-}
+    enforce_session_options(name);
 
-fn configure_session(name: &str) {
-    let opts: &[(&str, &str)] = &[
-        ("mouse", "on"),
-        ("default-terminal", "xterm-256color"),
-        ("allow-passthrough", "on"),
-        ("escape-time", "0"),
-    ];
-    for (key, val) in opts {
-        let _ = Command::new("tmux")
-            .args(["set-option", "-t", name, key, val])
-            .stderr(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .status();
-    }
     let _ = Command::new("tmux")
-        .args(["set-environment", "-t", name, "TERM", "xterm-256color"])
-        .stderr(std::process::Stdio::null())
+        .args(["send-keys", "-t", name, program, "Enter"])
         .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status();
+
+    Ok(())
 }
 
 pub fn new_window(session_name: &str, cwd: &Path, program: &str) -> Result<()> {
@@ -80,6 +107,7 @@ pub fn new_window(session_name: &str, cwd: &Path, program: &str) -> Result<()> {
             &cwd.to_string_lossy(),
             program,
         ])
+        .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()?;
 
@@ -99,6 +127,26 @@ pub fn resize_session(name: &str, cols: u16, rows: u16) {
         ])
         .stderr(std::process::Stdio::null())
         .output();
+}
+
+pub fn pane_command(name: &str) -> Option<String> {
+    Command::new("tmux")
+        .args(["list-panes", "-t", name, "-F", "#{pane_current_command}"])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+pub fn send_key(name: &str, key: &str) {
+    let _ = Command::new("tmux")
+        .args(["send-keys", "-t", name, key])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
 }
 
 pub fn kill_session(name: &str) {

@@ -16,7 +16,7 @@ pub fn render(
     area: Rect,
     state: &GlobalState,
     active_project_idx: Option<usize>,
-    active_workspace_idx: Option<usize>,
+    _active_workspace_idx: Option<usize>,
     list_state: &mut ListState,
     focused: bool,
 ) -> Vec<SidebarItem> {
@@ -33,10 +33,9 @@ pub fn render(
 
     let mut items = Vec::new();
     let mut sidebar_items = Vec::new();
-    let mut selected_row = None;
 
     if state.projects.is_empty() {
-        selected_row = Some(0);
+        list_state.select(Some(0));
         items.push(ListItem::new(Line::from(vec![Span::styled(
             "No projects. Press 'a' to add one.",
             Style::default().fg(theme::TEXT_MUTED),
@@ -49,13 +48,10 @@ pub fn render(
             let label = if project.expanded {
                 format!("{} {}", arrow, project.name)
             } else {
-                format!("{} {} ({})", arrow, project.name, project.workspaces.len())
+                format!("{} {} ({})", arrow, project.name, project.active().count())
             };
             let row_width = area.width.saturating_sub(2) as usize;
             let padding = " ".repeat(row_width.saturating_sub(label.chars().count() + 2));
-            if is_active_project && selected_row.is_none() {
-                selected_row = Some(sidebar_items.len());
-            }
             items.push(ListItem::new(Line::from(vec![
                 Span::styled(
                     label,
@@ -82,9 +78,6 @@ pub fn render(
                         }
                         WorkspaceStatus::Archived => ("⋯", Style::default().fg(theme::TEXT_DIM)),
                     };
-                    if is_active_project && active_workspace_idx == Some(workspace_idx) {
-                        selected_row = Some(sidebar_items.len());
-                    }
                     let inner_w = area.width.saturating_sub(2) as usize;
                     let left_len = 2 + 1 + 1 + ws.name.len();
                     let pad = inner_w.saturating_sub(left_len + 1);
@@ -122,7 +115,9 @@ pub fn render(
         sidebar_items.push(SidebarItem::AddProject);
     }
 
-    list_state.select(selected_row);
+    if list_state.selected().is_none() && !items.is_empty() {
+        list_state.select(Some(0));
+    }
 
     let list = List::new(items).block(block).highlight_style(
         Style::default()

@@ -64,8 +64,10 @@ pub fn create_workspace_entry(
     let base_dir = std::env::var("HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|_| std::env::temp_dir())
-        .join(".martins");
-    let worktree_path = base_dir.join(format!("{}-{}", repo_name, name));
+        .join(".martins")
+        .join("workspaces")
+        .join(repo_name);
+    let worktree_path = base_dir.join(&name);
 
     let ws = Workspace {
         name: name.clone(),

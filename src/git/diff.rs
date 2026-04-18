@@ -32,21 +32,24 @@ pub enum DiffError {
 /// Get list of files changed vs base_branch in the worktree at `worktree_path`.
 pub async fn modified_files(
     worktree_path: PathBuf,
-    base_branch: String,
+    _base_branch: String,
 ) -> Result<Vec<FileEntry>, DiffError> {
     tokio::task::spawn_blocking(move || {
         let repo = Repository::open(&worktree_path)?;
 
-        let base_obj = repo
-            .revparse_single(&base_branch)
-            .map_err(|_| DiffError::BaseBranchMissing(base_branch.clone()))?;
-        let base_commit = base_obj.peel_to_commit()?;
-        let base_tree = base_commit.tree()?;
+        let head_tree = repo
+            .head()
+            .and_then(|h| h.peel_to_commit())
+            .and_then(|c| c.tree())
+            .ok();
 
         let mut diff_opts = git2::DiffOptions::new();
         diff_opts.include_untracked(false);
 
-        let diff = repo.diff_tree_to_workdir_with_index(Some(&base_tree), Some(&mut diff_opts))?;
+        let diff = repo.diff_tree_to_workdir_with_index(
+            head_tree.as_ref(),
+            Some(&mut diff_opts),
+        )?;
 
         let mut entries: Vec<FileEntry> = Vec::new();
 
@@ -199,10 +202,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn missing_base_branch() {
+    async fn unknown_branch_still_works() {
         let tmp = TempDir::new().unwrap();
         init_repo_with_commit(tmp.path());
         let result = modified_files(tmp.path().to_path_buf(), "nonexistent".to_string()).await;
-        assert!(matches!(result, Err(DiffError::BaseBranchMissing(_))));
+        assert!(result.is_ok());
     }
 }

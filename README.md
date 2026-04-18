@@ -78,9 +78,9 @@ Once inside:
 | `n` | New workspace |
 | `t` | New tab (agent/shell) |
 | `T` | Close tab |
-| `1-9` | Switch tab |
-| `i` | Enter terminal mode |
-| `Esc Esc` | Exit terminal mode |
+| `1-9` | Switch tab (Normal mode) |
+| `F1-F9` | Switch tab (any mode) |
+| `Ctrl+B` | Switch to sidebar |
 | `d` | Delete workspace |
 | `a` | Archive workspace |
 | `p` | Preview file |

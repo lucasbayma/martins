@@ -15,7 +15,7 @@ mod ui;
 mod watcher;
 
 use anyhow::Result;
-use crossterm::{event::{DisableMouseCapture, EnableMouseCapture}, execute};
+use crossterm::{event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture}, execute};
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -52,14 +52,14 @@ async fn main() -> Result<()> {
     }
 
     let mut terminal = ratatui::init();
-    execute!(std::io::stdout(), EnableMouseCapture)?;
+    execute!(std::io::stdout(), EnableMouseCapture, EnableBracketedPaste)?;
 
     let result = match app::App::new(global_state, state_path).await {
         Ok(mut app) => app.run(&mut terminal).await,
         Err(error) => Err(error),
     };
 
-    let _ = execute!(std::io::stdout(), DisableMouseCapture);
+    let _ = execute!(std::io::stdout(), DisableMouseCapture, DisableBracketedPaste);
     ratatui::restore();
     result
 }

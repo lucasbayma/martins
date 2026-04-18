@@ -120,15 +120,22 @@ pub struct RemoveProjectForm {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct ArchiveForm {
+    pub workspace_name: String,
+}
+
+#[derive(Debug, Clone, Default)]
 pub enum Modal {
     #[default]
     None,
     NewWorkspace(NewWorkspaceForm),
     ConfirmQuit,
     ConfirmDelete(DeleteForm),
+    ConfirmArchive(ArchiveForm),
     ConfirmRemoveProject(RemoveProjectForm),
     AddProject(AddProjectForm),
     Help,
+    Loading(String),
 }
 
 pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -157,10 +164,34 @@ pub fn render(frame: &mut Frame, modal: &Modal) {
         Modal::NewWorkspace(form) => render_new_workspace(frame, form),
         Modal::ConfirmQuit => render_confirm_quit(frame),
         Modal::ConfirmDelete(form) => render_confirm_delete(frame, form),
+        Modal::ConfirmArchive(form) => render_confirm_archive(frame, form),
         Modal::ConfirmRemoveProject(form) => render_confirm_remove_project(frame, form),
         Modal::AddProject(form) => render_add_project(frame, form),
         Modal::Help => render_help(frame),
+        Modal::Loading(msg) => render_loading(frame, msg),
     }
+}
+
+fn render_loading(frame: &mut Frame, message: &str) {
+    let area = centered_rect(40, 20, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::ACCENT_GOLD));
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            format!("  {message}"),
+            Style::default()
+                .fg(theme::TEXT_PRIMARY)
+                .add_modifier(Modifier::BOLD),
+        )]),
+    ];
+
+    let para = Paragraph::new(lines).block(block);
+    frame.render_widget(para, area);
 }
 
 fn agent_label(agent: &Agent) -> &'static str {
@@ -402,6 +433,37 @@ fn render_confirm_delete(frame: &mut Frame, form: &DeleteForm) {
     frame.render_widget(para, area);
 }
 
+fn render_confirm_archive(frame: &mut Frame, form: &ArchiveForm) {
+    let area = centered_rect(50, 30, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(" CONFIRM ARCHIVE ")
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::ACCENT_GOLD));
+
+    let lines = vec![
+        Line::from(vec![
+            Span::styled("Archive workspace: ", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(
+                &form.workspace_name,
+                Style::default()
+                    .fg(theme::TEXT_PRIMARY)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[Enter] Archive  ", Style::default().fg(theme::ACCENT_GOLD)),
+            Span::styled("[Esc] Cancel", Style::default().fg(theme::TEXT_MUTED)),
+        ]),
+    ];
+
+    let para = Paragraph::new(lines).block(block);
+    frame.render_widget(para, area);
+}
+
 fn render_confirm_quit(frame: &mut Frame) {
     let area = centered_rect(40, 30, frame.area());
     frame.render_widget(Clear, area);
@@ -493,9 +555,9 @@ fn render_help(frame: &mut Frame) {
         Line::from(""),
         section("Navigation"),
         shortcut("j/k  ↑/↓", "Move selection"),
-        shortcut("1-9", "Switch tab"),
-        shortcut("i", "Enter terminal mode"),
-        shortcut("Esc Esc", "Exit terminal mode"),
+        shortcut("1-9", "Switch tab (Normal mode)"),
+            shortcut("F1-F9", "Switch tab (any mode)"),
+        shortcut("Ctrl+B", "Switch to sidebar"),
         Line::from(""),
         section("Workspace"),
         shortcut("n", "New workspace"),

@@ -1,7 +1,7 @@
 //! Application state and main event loop.
 
 use crate::git::{diff, repo};
-use crate::keys::{Action, EscapeDetector, InputMode, Keymap};
+use crate::keys::{Action, InputMode, Keymap};
 use crate::pty::manager::PtyManager;
 use crate::state::{Agent, GlobalState, Project, TabSpec, Workspace};
 use crate::ui::layout::{self, LayoutState, PaneRects};
@@ -10,7 +10,7 @@ use crate::ui::picker::{self, Picker, PickerKind, PickerOutcome};
 use crate::ui::preview;
 use anyhow::Result;
 use crossterm::event::{
-    Event, EventStream, KeyCode, KeyEvent, KeyEventKind, MouseButton, MouseEvent,
+    Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent,
     MouseEventKind,
 };
 use futures::StreamExt;
@@ -72,7 +72,7 @@ pub struct App {
     pub active_workspace_idx: Option<usize>,
     pub active_tab: usize,
     pub modified_files: Vec<crate::git::diff::FileEntry>,
-    pub escape_detector: EscapeDetector,
+
     pub keymap: Keymap,
     pub should_quit: bool,
     pub watcher: Option<crate::watcher::Watcher>,
@@ -81,6 +81,8 @@ pub struct App {
     pub state_path: PathBuf,
     pub last_pty_size: (u16, u16),
     pub selection: Option<SelectionState>,
+    pub last_frame_area: Rect,
+    pub pending_workspace: Option<Option<String>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,7 +122,7 @@ impl App {
             global_state,
             active_project_idx,
             layout: LayoutState::new(),
-            mode: InputMode::Normal,
+            mode: InputMode::Terminal,
             modal: Modal::None,
             picker: None,
             preview_lines: None,
@@ -130,7 +132,7 @@ impl App {
             active_workspace_idx,
             active_tab: 0,
             modified_files: Vec::new(),
-            escape_detector: EscapeDetector::new(),
+
             keymap: Keymap::default_keymap(),
             should_quit: false,
             watcher,
@@ -139,6 +141,8 @@ impl App {
             state_path,
             last_pty_size: (24, 80),
             selection: None,
+            last_frame_area: Rect::default(),
+            pending_workspace: None,
 
         };
         app.refresh_diff().await;
@@ -184,7 +188,7 @@ impl App {
                     let tmux_name =
                         crate::tmux::tab_session_name(&project.id, &workspace.name, tab.id);
                     if !existing_sessions.contains(&tmux_name) {
-                        let program = tab_program(&tab.command);
+                        let program = tab_program_for_resume(&tab.command);
                         let _ = crate::tmux::new_session(
                             &tmux_name,
                             &workspace.worktree_path,
@@ -208,7 +212,20 @@ impl App {
                     let tmux_name =
                         crate::tmux::tab_session_name(&project.id, &workspace.name, tab.id);
 
+                    crate::tmux::enforce_session_options(&tmux_name);
                     crate::tmux::resize_session(&tmux_name, cols, rows);
+
+                    if tab.command != "shell" {
+                        let current = crate::tmux::pane_command(&tmux_name);
+                        let is_shell = current.as_deref().is_none_or(|cmd| {
+                            matches!(cmd, "bash" | "zsh" | "sh" | "fish" | "dash")
+                        });
+                        if is_shell {
+                            let program = tab_program_for_resume(&tab.command);
+                            crate::tmux::send_key(&tmux_name, &program);
+                            crate::tmux::send_key(&tmux_name, "Enter");
+                        }
+                    }
 
                     let _ = self.pty_manager.spawn_tab(
                         project.id.clone(),
@@ -248,6 +265,19 @@ impl App {
             terminal.draw(|frame| self.draw(frame))?;
             self.sync_pty_size();
 
+            if let Some(name) = self.pending_workspace.take() {
+                match self.create_workspace(name).await {
+                    Ok(()) => self.modal = Modal::None,
+                    Err(error) => {
+                        self.modal = Modal::NewWorkspace(NewWorkspaceForm {
+                            name_input: String::new(),
+                            error: Some(error),
+                        });
+                    }
+                }
+                continue;
+            }
+
             if self.should_quit {
                 break;
             }
@@ -256,9 +286,7 @@ impl App {
                 Some(Ok(event)) = events.next() => {
                     self.handle_event(event).await;
                 }
-                _ = self.pty_manager.output_notify.notified() => {
-                    tokio::time::sleep(Duration::from_millis(16)).await;
-                }
+                _ = self.pty_manager.output_notify.notified() => {}
                 _ = refresh_tick.tick() => {
                     self.refresh_diff().await;
                 }
@@ -301,6 +329,7 @@ impl App {
 
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
+        self.last_frame_area = area;
 
         if layout::is_too_small(area) {
             let message = Paragraph::new("Terminal too small (min 80×24)")
@@ -474,6 +503,11 @@ impl App {
         match event {
             Event::Key(key) if key.kind == KeyEventKind::Press => self.handle_key(key).await,
             Event::Mouse(mouse) => self.handle_mouse(mouse).await,
+            Event::Paste(text) => {
+                if self.mode == InputMode::Terminal {
+                    self.write_active_tab_input(text.as_bytes());
+                }
+            }
             Event::Resize(_, _) => {}
             _ => {}
         }
@@ -485,7 +519,7 @@ impl App {
             rect_contains(inner, mouse.column, mouse.row)
         });
 
-        if self.mode == InputMode::Terminal && in_terminal {
+        if in_terminal {
             match mouse.kind {
                 MouseEventKind::Down(MouseButton::Left) => {
                     let inner = terminal_content_rect(self.last_panes.as_ref().unwrap().terminal);
@@ -517,19 +551,14 @@ impl App {
                             self.copy_selection_to_clipboard();
                         } else {
                             self.selection = None;
+                            if self.mode != InputMode::Terminal {
+                                self.mode = InputMode::Terminal;
+                            }
                         }
                         return;
                     }
                 }
-                MouseEventKind::ScrollUp => {
-                    self.forward_scroll_to_pty(true);
-                    return;
-                }
-                MouseEventKind::ScrollDown => {
-                    self.forward_scroll_to_pty(false);
-                    return;
-                }
-                _ => return,
+                _ => {}
             }
         }
 
@@ -555,8 +584,18 @@ impl App {
         let Some(panes) = &self.last_panes else { return };
 
         if rect_contains(panes.terminal, col, row) {
-            let scroll_bytes: &[u8] = if delta < 0 { b"\x1b[5~" } else { b"\x1b[6~" };
-            self.write_active_tab_input(scroll_bytes);
+            if let Some(project) = self.active_project() {
+                if let Some(workspace) = self.active_workspace() {
+                    let sessions = self.active_sessions();
+                    if let Some((tab_id, _)) = sessions.get(self.active_tab) {
+                        let tmux_name = crate::tmux::tab_session_name(
+                            &project.id, &workspace.name, *tab_id,
+                        );
+                        let key = if delta < 0 { "PageUp" } else { "PageDown" };
+                        crate::tmux::send_key(&tmux_name, key);
+                    }
+                }
+            }
             return;
         }
 
@@ -578,11 +617,19 @@ impl App {
     }
 
     async fn handle_click(&mut self, col: u16, row: u16) {
+        if self.handle_picker_click(col, row).await {
+            return;
+        }
+
         if self.handle_modal_click(col, row).await {
             return;
         }
 
         let Some(panes) = self.last_panes.clone() else { return };
+
+        if !rect_contains(panes.terminal, col, row) {
+            self.mode = InputMode::Normal;
+        }
 
         if rect_contains(panes.terminal, col, row) {
             if row == panes.terminal.y {
@@ -675,28 +722,27 @@ impl App {
     }
 
     async fn handle_key(&mut self, key: KeyEvent) {
-        if let Some(picker) = &mut self.picker {
-            let kind = picker.kind.clone();
-            match picker.on_key(key) {
-                PickerOutcome::Cancelled => self.picker = None,
-                PickerOutcome::Selected(index) => {
-                    self.picker = None;
-                    match kind {
-                        PickerKind::Workspaces => self.select_active_workspace(index),
-                        PickerKind::NewTab => {
-                            if let Some(command) = ["opencode", "claude", "codex", "shell"]
-                                .get(index)
-                                .map(|command| (*command).to_string())
-                                && let Err(error) = self.create_tab(command).await
-                            {
-                                tracing::error!("failed to create tab: {error}");
-                            }
-                        }
-                        PickerKind::ModifiedFiles => {}
-                    }
+        if let KeyCode::F(n) = key.code {
+            if (1..=9).contains(&n) {
+                let tab_count = self
+                    .active_workspace()
+                    .map(|ws| ws.tabs.len())
+                    .unwrap_or(0);
+                if tab_count > 0 {
+                    self.active_tab = (n as usize - 1).min(tab_count - 1);
+                    self.mode = InputMode::Terminal;
                 }
-                PickerOutcome::Continue => {}
+                return;
             }
+        }
+
+        if let Some(picker) = &mut self.picker {
+            let outcome = picker.on_key(key);
+            self.apply_picker_outcome(outcome).await;
+            return;
+        }
+
+        if matches!(self.modal, Modal::Loading(_)) {
             return;
         }
 
@@ -706,8 +752,8 @@ impl App {
         }
 
         if self.mode == InputMode::Terminal {
-            if let Some(Action::ExitTerminalMode) =
-                crate::keys::resolve_terminal(&mut self.escape_detector, &key)
+            if key.code == KeyCode::Char('b')
+                && key.modifiers.contains(KeyModifiers::CONTROL)
             {
                 self.mode = InputMode::Normal;
                 return;
@@ -730,14 +776,7 @@ impl App {
             Modal::NewWorkspace(mut form) => match key.code {
                 KeyCode::Esc => self.modal = Modal::None,
                 KeyCode::Enter => {
-                    let name = (!form.name_input.is_empty()).then(|| form.name_input.clone());
-                    match self.create_workspace(name).await {
-                        Ok(()) => self.modal = Modal::None,
-                        Err(error) => {
-                            form.error = Some(error);
-                            self.modal = Modal::NewWorkspace(form);
-                        }
-                    }
+                    self.queue_workspace_creation(&form);
                 }
                 KeyCode::Backspace => {
                     form.name_input.pop();
@@ -790,12 +829,7 @@ impl App {
             Modal::ConfirmDelete(form) => match key.code {
                 KeyCode::Esc => self.modal = Modal::None,
                 KeyCode::Enter => {
-                    let name = form.workspace_name.clone();
-                    if let Some(project) = self.active_project_mut() {
-                        project.remove(&name);
-                    }
-                    self.refresh_active_workspace_after_change();
-                    self.save_state();
+                    self.confirm_delete_workspace(&form);
                     self.modal = Modal::None;
                 }
                 _ => self.modal = Modal::ConfirmDelete(form),
@@ -808,26 +842,22 @@ impl App {
                 }
                 _ => self.modal = Modal::ConfirmQuit,
             },
+            Modal::ConfirmArchive(form) => match key.code {
+                KeyCode::Esc => self.modal = Modal::None,
+                KeyCode::Enter => {
+                    if let Some(project) = self.active_project_mut() {
+                        project.archive(&form.workspace_name);
+                    }
+                    self.modal = Modal::None;
+                    self.refresh_active_workspace_after_change();
+                    self.save_state();
+                }
+                _ => self.modal = Modal::ConfirmArchive(form),
+            },
             Modal::ConfirmRemoveProject(form) => match key.code {
                 KeyCode::Esc => self.modal = Modal::None,
                 KeyCode::Enter => {
-                    self.global_state.remove_project(&form.project_id);
-                    self.active_project_idx = self
-                        .global_state
-                        .active_project_id
-                        .as_ref()
-                        .and_then(|id| self.global_state.projects.iter().position(|project| &project.id == id));
-                    if let Some(idx) = self.active_project_idx {
-                        self.switch_project(idx).await;
-                    } else {
-                        self.active_workspace_idx = None;
-                        self.active_tab = 0;
-                        self.modified_files.clear();
-                        self.right_list.select(None);
-                        self.preview_lines = None;
-                        self.watcher = None;
-                    }
-                    self.save_state();
+                    self.confirm_remove_project(&form).await;
                     self.modal = Modal::None;
                 }
                 _ => self.modal = Modal::ConfirmRemoveProject(form),
@@ -839,19 +869,15 @@ impl App {
                     self.modal = Modal::Help;
                 }
             }
+            Modal::Loading(_) => {}
         }
     }
 
     async fn handle_modal_click(&mut self, col: u16, row: u16) -> bool {
-        let frame_area = self.last_panes.as_ref().map(|p| {
-            Rect {
-                x: 0,
-                y: 0,
-                width: p.terminal.x + p.terminal.width + p.right.map(|r| r.width).unwrap_or(0),
-                height: p.menu_bar.y + p.menu_bar.height,
-            }
-        });
-        let Some(frame_area) = frame_area else { return false };
+        let frame_area = self.last_frame_area;
+        if frame_area.width == 0 || frame_area.height == 0 {
+            return false;
+        }
 
         match self.modal.clone() {
             Modal::AddProject(form) => {
@@ -921,21 +947,87 @@ impl App {
                     self.modal = Modal::None;
                     return true;
                 }
+
+                if row == modal_button_row_y(modal_area) {
+                    if is_modal_first_button(modal_area, col, 14) {
+                        self.modal = Modal::None;
+                        self.should_quit = true;
+                    } else {
+                        self.modal = Modal::None;
+                    }
+                }
                 true
             }
-            Modal::ConfirmRemoveProject(_) => {
+            Modal::ConfirmArchive(form) => {
+                let modal_area = crate::ui::modal::centered_rect(50, 30, frame_area);
+                if !rect_contains(modal_area, col, row) {
+                    self.modal = Modal::None;
+                    return true;
+                }
+
+                if row == modal_button_row_y(modal_area) {
+                    if is_modal_first_button(modal_area, col, 17) {
+                        if let Some(project) = self.active_project_mut() {
+                            project.archive(&form.workspace_name);
+                        }
+                        self.refresh_active_workspace_after_change();
+                        self.save_state();
+                    }
+                    self.modal = Modal::None;
+                }
+                true
+            }
+            Modal::ConfirmDelete(form) => {
+                let modal_area = crate::ui::modal::centered_rect(50, 40, frame_area);
+                if !rect_contains(modal_area, col, row) {
+                    self.modal = Modal::None;
+                    return true;
+                }
+
+                if row == modal_button_row_y(modal_area) {
+                    if is_modal_first_button(modal_area, col, 12) {
+                        self.confirm_delete_workspace(&form);
+                    }
+                    self.modal = Modal::None;
+                }
+                true
+            }
+            Modal::ConfirmRemoveProject(form) => {
                 let modal_area = crate::ui::modal::centered_rect(50, 35, frame_area);
                 if !rect_contains(modal_area, col, row) {
                     self.modal = Modal::None;
                     return true;
                 }
+
+                if row == modal_button_row_y(modal_area) {
+                    if is_modal_first_button(modal_area, col, 16) {
+                        self.confirm_remove_project(&form).await;
+                    }
+                    self.modal = Modal::None;
+                }
                 true
             }
             Modal::Help => {
                 let modal_area = crate::ui::modal::centered_rect(70, 80, frame_area);
+                self.modal = Modal::None;
+                let _ = rect_contains(modal_area, col, row);
+                true
+            }
+            Modal::NewWorkspace(form) => {
+                let modal_area = crate::ui::modal::centered_rect(50, 30, frame_area);
                 if !rect_contains(modal_area, col, row) {
                     self.modal = Modal::None;
                     return true;
+                }
+
+                if row == modal_button_row_y(modal_area) {
+                    if is_modal_first_button(modal_area, col, 12) {
+                        self.queue_workspace_creation(&form);
+                    } else {
+                        self.modal = Modal::None;
+                    }
+                } else {
+                    self.modal = Modal::NewWorkspace(form);
                 }
                 true
             }
@@ -943,20 +1035,74 @@ impl App {
         }
     }
 
+    async fn handle_picker_click(&mut self, col: u16, row: u16) -> bool {
+        let Some(picker) = &self.picker else { return false };
+
+        let frame_area = self.last_frame_area;
+        if frame_area.width == 0 || frame_area.height == 0 {
+            return false;
+        }
+
+        let picker_area = picker_area(frame_area);
+        if !rect_contains(picker_area, col, row) {
+            self.picker = None;
+            return true;
+        }
+
+        let list_y = picker_area.y + 3;
+        let list_height = picker_area.height.saturating_sub(4);
+        if row >= list_y && row < list_y + list_height {
+            let click_idx = (row - list_y) as usize;
+            if let Some(&item_idx) = picker.filtered.get(click_idx) {
+                self.apply_picker_outcome(PickerOutcome::Selected(item_idx)).await;
+                return true;
+            }
+        }
+
+        true
+    }
+
+    async fn apply_picker_outcome(&mut self, outcome: PickerOutcome) {
+        match outcome {
+            PickerOutcome::Cancelled => self.picker = None,
+            PickerOutcome::Selected(index) => {
+                let kind = self.picker.as_ref().map(|picker| picker.kind.clone());
+                self.picker = None;
+                match kind {
+                    Some(PickerKind::Workspaces) => self.select_active_workspace(index),
+                    Some(PickerKind::NewTab) => {
+                        if let Some(command) = ["opencode", "claude", "codex", "shell"]
+                            .get(index)
+                            .map(|command| (*command).to_string())
+                            && let Err(error) = self.create_tab(command).await
+                        {
+                            tracing::error!("failed to create tab: {error}");
+                        }
+                    }
+                    Some(PickerKind::ModifiedFiles) | None => {}
+                }
+            }
+            PickerOutcome::Continue => {}
+        }
+    }
+
     async fn dispatch_action(&mut self, action: Action) {
         match action {
             Action::Quit => self.modal = Modal::ConfirmQuit,
             Action::NextItem => {
-                let len = self.active_project().map(|project| project.active().count()).unwrap_or(0);
+                let len = self.sidebar_items.len();
                 if len > 0 {
-                    let current = self.active_workspace_idx.unwrap_or(0);
-                    self.select_active_workspace((current + 1).min(len - 1));
+                    let current = self.left_list.selected().unwrap_or(0);
+                    let next = (current + 1).min(len - 1);
+                    self.left_list.select(Some(next));
+                    self.activate_sidebar_item(next).await;
                 }
             }
             Action::PrevItem => {
-                if let Some(current) = self.active_workspace_idx {
-                    self.select_active_workspace(current.saturating_sub(1));
-                }
+                let current = self.left_list.selected().unwrap_or(0);
+                let prev = current.saturating_sub(1);
+                self.left_list.select(Some(prev));
+                self.activate_sidebar_item(prev).await;
             }
             Action::EnterSelected => {
                 let has_tabs = self
@@ -1043,18 +1189,13 @@ impl App {
                     self.modal = Modal::AddProject(AddProjectForm::default());
                     return;
                 }
-                if let Some(index) = self.active_workspace_idx {
-                    let name = self
-                        .active_project()
-                        .and_then(|project| project.active().nth(index))
-                        .map(|workspace| workspace.name.clone());
-                    if let Some(name) = name {
-                        if let Some(project) = self.active_project_mut() {
-                            project.archive(&name);
-                        }
-                        self.refresh_active_workspace_after_change();
-                        self.save_state();
-                    }
+                if let Some(name) = self
+                    .active_workspace()
+                    .map(|ws| ws.name.clone())
+                {
+                    self.modal = Modal::ConfirmArchive(crate::ui::modal::ArchiveForm {
+                        workspace_name: name,
+                    });
                 }
             }
             Action::Preview => {
@@ -1141,6 +1282,24 @@ impl App {
         }
     }
 
+    async fn activate_sidebar_item(&mut self, index: usize) {
+        let Some(item) = self.sidebar_items.get(index).cloned() else { return };
+        match item {
+            SidebarItem::RemoveProject(project_idx) => {
+                if self.active_project_idx != Some(project_idx) {
+                    self.switch_project(project_idx).await;
+                }
+            }
+            SidebarItem::Workspace(project_idx, workspace_idx) => {
+                if self.active_project_idx != Some(project_idx) {
+                    self.switch_project(project_idx).await;
+                }
+                self.select_active_workspace(workspace_idx);
+            }
+            _ => {}
+        }
+    }
+
     fn open_new_tab_picker(&mut self) {
         self.picker = Some(Picker::new(
             vec![
@@ -1200,17 +1359,59 @@ impl App {
         self.refresh_diff().await;
     }
 
+    fn queue_workspace_creation(&mut self, form: &NewWorkspaceForm) {
+        let name = (!form.name_input.is_empty()).then(|| form.name_input.clone());
+        self.modal = Modal::Loading("Creating workspace...".to_string());
+        self.pending_workspace = Some(name);
+    }
+
+    fn confirm_delete_workspace(&mut self, form: &crate::ui::modal::DeleteForm) {
+        let name = form.workspace_name.clone();
+        if let Some(project) = self.active_project_mut() {
+            project.remove(&name);
+        }
+        self.refresh_active_workspace_after_change();
+        self.save_state();
+    }
+
+    async fn confirm_remove_project(&mut self, form: &crate::ui::modal::RemoveProjectForm) {
+        self.global_state.remove_project(&form.project_id);
+        self.active_project_idx = self
+            .global_state
+            .active_project_id
+            .as_ref()
+            .and_then(|id| self.global_state.projects.iter().position(|project| &project.id == id));
+        if let Some(idx) = self.active_project_idx {
+            self.switch_project(idx).await;
+        } else {
+            self.active_workspace_idx = None;
+            self.active_tab = 0;
+            self.modified_files.clear();
+            self.right_list.select(None);
+            self.preview_lines = None;
+            self.watcher = None;
+        }
+        self.save_state();
+    }
+
     fn write_active_tab_input(&mut self, bytes: &[u8]) {
         let Some(project) = self.active_project() else { return };
         let Some(workspace) = self.active_workspace() else { return };
 
+        let sessions = self.active_sessions();
+        let Some((tab_id, session)) = sessions.get(self.active_tab) else {
+            self.mode = InputMode::Normal;
+            return;
+        };
+
+        if session.is_exited() {
+            self.mode = InputMode::Normal;
+            return;
+        }
+
         let project_id = project.id.clone();
         let ws_name = workspace.name.clone();
-        let sessions = self.active_sessions();
-        let tab_id = sessions
-            .get(self.active_tab)
-            .map(|(id, _)| *id)
-            .unwrap_or(0);
+        let tab_id = *tab_id;
 
         let _ = self.pty_manager.write_input(&project_id, &ws_name, tab_id, bytes);
     }
@@ -1244,11 +1445,6 @@ impl App {
                 }
                 child.wait().map(|_| ())
             });
-    }
-
-    fn forward_scroll_to_pty(&mut self, up: bool) {
-        let bytes: &[u8] = if up { b"\x1b[5~" } else { b"\x1b[6~" };
-        self.write_active_tab_input(bytes);
     }
 
     fn forward_key_to_pty(&mut self, key: &KeyEvent) {
@@ -1315,19 +1511,32 @@ impl App {
             .active_project_mut()
             .ok_or_else(|| "no active project".to_string())?;
 
-        let ws_name = crate::agents::create_workspace_entry(project, name, Agent::default())
-            .map_err(|error| error.to_string())?;
+        if let Some(ref n) = name {
+            if project.workspaces.iter().any(|w| w.name == *n) {
+                return Err(format!("workspace '{}' already exists", n));
+            }
+        }
 
         let repo_root = project.repo_root.clone();
         let base_branch = project.base_branch.clone();
+
+        let ws_name = crate::agents::create_workspace_entry(project, name, Agent::default())
+            .map_err(|error| error.to_string())?;
 
         let wt_path = crate::git::worktree::create(
             repo_root,
             ws_name.clone(),
             base_branch,
         )
-        .await
-        .map_err(|e| e.to_string())?;
+        .await;
+
+        if let Err(e) = &wt_path {
+            if let Some(project) = self.active_project_mut() {
+                project.remove(&ws_name);
+            }
+            return Err(e.to_string());
+        }
+        let wt_path = wt_path.unwrap();
 
         let ws = self
             .active_project_mut()
@@ -1360,7 +1569,7 @@ impl App {
         let next_id = workspace.tabs.iter().map(|tab| tab.id).max().map_or(0, |id| id + 1);
         let (rows, cols) = self.last_pty_size;
         let tmux_name = crate::tmux::tab_session_name(&project_id, &ws_name, next_id);
-        let program = tab_program(&command);
+        let program = tab_program_for_new(&command);
 
         let tmux_name_c = tmux_name.clone();
         let worktree_c = worktree_path.clone();
@@ -1454,6 +1663,23 @@ fn rect_contains(rect: Rect, col: u16, row: u16) -> bool {
     col >= rect.x && col < rect.x + rect.width && row >= rect.y && row < rect.y + rect.height
 }
 
+fn modal_button_row_y(modal_area: Rect) -> u16 {
+    modal_area.y + modal_area.height.saturating_sub(2)
+}
+
+fn is_modal_first_button(modal_area: Rect, col: u16, width: u16) -> bool {
+    let inner_x = modal_area.x + 1;
+    col >= inner_x && col < inner_x + width
+}
+
+fn picker_area(frame_area: Rect) -> Rect {
+    let w = (frame_area.width as f32 * 0.6) as u16;
+    let h = (frame_area.height as f32 * 0.5) as u16;
+    let x = (frame_area.width.saturating_sub(w)) / 2;
+    let y = (frame_area.height.saturating_sub(h)) / 2;
+    Rect::new(x, y, w, h)
+}
+
 fn move_list_selection(list: &mut ListState, len: usize, delta: isize) {
     if len == 0 {
         list.select(None);
@@ -1540,15 +1766,24 @@ fn terminal_content_rect(terminal: Rect) -> Rect {
     }
 }
 
-fn tab_program(command: &str) -> String {
-    if command == "shell" {
-        if Path::new("/bin/zsh").exists() {
-            "/bin/zsh".to_string()
-        } else {
-            "/bin/sh".to_string()
+fn tab_program_for_new(command: &str) -> String {
+    match command {
+        "shell" => {
+            if Path::new("/bin/zsh").exists() {
+                "/bin/zsh".to_string()
+            } else {
+                "/bin/sh".to_string()
+            }
         }
-    } else {
-        command.to_string()
+        _ => command.to_string(),
+    }
+}
+
+fn tab_program_for_resume(command: &str) -> String {
+    match command {
+        "shell" => tab_program_for_new(command),
+        "opencode" => "opencode -c".to_string(),
+        _ => command.to_string(),
     }
 }
 

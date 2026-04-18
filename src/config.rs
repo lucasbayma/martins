@@ -7,26 +7,19 @@ use sha2::{Digest, Sha256};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
+fn martins_home() -> PathBuf {
+    std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir())
+        .join(".martins")
+}
+
 pub fn global_state_path() -> PathBuf {
-    if let Some(dirs) = ProjectDirs::from("", "", "martins") {
-        dirs.data_dir().join("state.json")
-    } else {
-        let home = std::env::var("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| std::env::temp_dir());
-        home.join(".martins").join("state.json")
-    }
+    martins_home().join("state.json")
 }
 
 pub fn global_log_dir() -> PathBuf {
-    if let Some(dirs) = ProjectDirs::from("", "", "martins") {
-        dirs.data_dir().join("logs")
-    } else {
-        let home = std::env::var("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| std::env::temp_dir());
-        home.join(".martins").join("logs")
-    }
+    martins_home().join("logs")
 }
 
 #[allow(dead_code)]
