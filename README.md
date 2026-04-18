@@ -89,6 +89,42 @@ Once inside:
 | `?` | Show help |
 | `q` | Quit |
 
+## Architecture & Stack
+
+Martins is built on a stack chosen for speed, reliability, and zero-compromise terminal rendering.
+
+### Rust
+
+The entire application is written in Rust. No garbage collector, no runtime overhead. The event loop processes input, renders frames, and manages PTY sessions within a single `tokio` async runtime. The result is sub-millisecond input latency and a ~4MB binary with no external runtime dependencies.
+
+### tmux
+
+Every tab runs inside its own [tmux](https://github.com/tmux/tmux) session. When you close Martins, the tmux sessions keep running in the background — your agents continue working. When you reopen, Martins reattaches to the existing sessions and restores the full terminal output, scrollback, and conversation state. No lost context, no restarted agents, no wasted tokens.
+
+### ratatui + crossterm
+
+The TUI is rendered with [ratatui](https://github.com/ratatui/ratatui) and [crossterm](https://github.com/crossterm-rs/crossterm), the standard Rust terminal UI stack. Full mouse support with click-to-navigate projects, workspaces, tabs, and files. Client-side text selection with automatic clipboard copy — no modifier keys needed.
+
+### portable-pty + vt100
+
+Each terminal tab is a real PTY session managed by [portable-pty](https://github.com/wez/wezterm/tree/main/pty). Terminal output is parsed by the [vt100](https://github.com/doy/vt100-rust) crate, which implements a complete VT100/xterm terminal emulator in software. This means full support for colors, cursor positioning, alternate screen buffers, and any TUI application running inside the agents.
+
+### git2 + worktrees
+
+Each workspace gets its own [git worktree](https://git-scm.com/docs/git-worktree) via [libgit2](https://github.com/rust-lang/git2-rs). Worktrees are isolated copies of the repository that share the same `.git` directory — so each agent works on its own branch without interfering with others. No stashing, no branch switching, no merge conflicts between agents. Worktrees are stored at `~/.martins/` to keep your project directories clean.
+
+### Why this stack
+
+| Concern | How it's solved |
+|---|---|
+| **Performance** | Rust + async tokio — no GC pauses, 60fps rendering, 16KB PTY read buffers |
+| **Session persistence** | tmux — agents survive app restarts, terminal crashes, SSH disconnects |
+| **Isolation** | git worktrees — each agent gets its own branch and working directory |
+| **Terminal fidelity** | vt100 parser — full escape sequence support, alternate screen, colors, cursor |
+| **Native feel** | ratatui — renders directly to the terminal, no Electron, no web views, no overhead |
+| **Clipboard** | Client-side selection with `pbcopy` — works in any terminal emulator |
+| **Binary size** | ~4MB static binary — `brew install` and you're done |
+
 ## Requirements
 
 - **macOS** (Apple Silicon or Intel)

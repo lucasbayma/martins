@@ -2,6 +2,7 @@
 
 #![allow(dead_code)]
 
+use crate::app::SelectionState;
 use crate::keys::InputMode;
 use crate::pty::session::PtySession;
 use crate::state::TabSpec;
@@ -31,6 +32,7 @@ pub fn render(
     mode: InputMode,
     focused: bool,
     workspace_info: Option<&WorkspaceInfo>,
+    selection: Option<&SelectionState>,
 ) {
     if tab_specs.is_empty() {
         let block = Block::default()
@@ -127,12 +129,41 @@ pub fn render(
 
     frame.render_widget(block, term_area);
 
-    if let Some((_, session)) = sessions.get(active_tab)
-        && let Ok(parser) = session.parser.try_read()
-    {
-        let pseudo_terminal = PseudoTerminal::new(parser.screen());
-        frame.render_widget(pseudo_terminal, inner);
+    if let Some((_, session)) = sessions.get(active_tab) {
+        let parser_guard = session.parser.try_read().or_else(|_| {
+            std::thread::sleep(std::time::Duration::from_micros(500));
+            session.parser.try_read()
+        });
+        if let Ok(parser) = parser_guard {
+            let pseudo_terminal = PseudoTerminal::new(parser.screen());
+            frame.render_widget(pseudo_terminal, inner);
+        }
     }
+
+    if let Some(sel) = selection {
+        if !sel.is_empty() {
+            let ((sc, sr), (ec, er)) = sel.normalized();
+            let buf = frame.buffer_mut();
+            for row in sr..=er {
+                if row >= inner.height {
+                    break;
+                }
+                let c_start = if row == sr { sc } else { 0 };
+                let c_end = if row == er { ec } else { inner.width.saturating_sub(1) };
+                for col in c_start..=c_end {
+                    if col >= inner.width {
+                        break;
+                    }
+                    if let Some(cell) = buf.cell_mut((inner.x + col, inner.y + row)) {
+                        cell.set_bg(theme::ACCENT_GOLD);
+                        cell.set_fg(theme::BG_SURFACE);
+                    }
+                }
+            }
+        }
+    }
+
+
 }
 
 #[cfg(test)]
@@ -147,7 +178,7 @@ mod tests {
 
         terminal
             .draw(|frame| {
-                render(frame, frame.area(), &[], &[], 0, InputMode::Normal, false, None);
+                render(frame, frame.area(), &[], &[], 0, InputMode::Normal, false, None, None);
             })
             .unwrap();
 
@@ -164,7 +195,7 @@ mod tests {
 
         terminal
             .draw(|frame| {
-                render(frame, frame.area(), &[], &[], 0, InputMode::Terminal, true, None);
+                render(frame, frame.area(), &[], &[], 0, InputMode::Terminal, true, None, None);
             })
             .unwrap();
     }

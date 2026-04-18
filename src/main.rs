@@ -28,14 +28,16 @@ async fn main() -> Result<()> {
     let mut global_state = state::GlobalState::load(&state_path).unwrap_or_default();
 
     let cwd = std::env::current_dir()?;
-    if let Ok(repo_root) = crate::git::repo::discover(&cwd) {
-        let base_branch = crate::git::repo::current_branch_async(repo_root.clone())
-            .await
-            .unwrap_or_else(|_| "main".to_string());
-        let project_id = global_state.ensure_project(&repo_root, base_branch);
-        let _ = config::ensure_gitignore(&repo_root);
-        if global_state.active_project_id.is_none() {
-            global_state.active_project_id = Some(project_id);
+    if global_state.projects.is_empty() {
+        if let Ok(repo_root) = crate::git::repo::discover(&cwd) {
+            let base_branch = crate::git::repo::current_branch_async(repo_root.clone())
+                .await
+                .unwrap_or_else(|_| "main".to_string());
+            let project_id = global_state.ensure_project(&repo_root, base_branch);
+            let _ = config::ensure_gitignore(&repo_root);
+            if global_state.active_project_id.is_none() {
+                global_state.active_project_id = Some(project_id);
+            }
         }
     }
 

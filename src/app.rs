@@ -31,6 +31,33 @@ pub enum SidebarItem {
     NewWorkspace(usize),
 }
 
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SelectionState {
+    pub start_col: u16,
+    pub start_row: u16,
+    pub end_col: u16,
+    pub end_row: u16,
+    pub dragging: bool,
+}
+
+impl SelectionState {
+    pub fn normalized(&self) -> ((u16, u16), (u16, u16)) {
+        if self.start_row < self.end_row
+            || (self.start_row == self.end_row && self.start_col <= self.end_col)
+        {
+            ((self.start_col, self.start_row), (self.end_col, self.end_row))
+        } else {
+            ((self.end_col, self.end_row), (self.start_col, self.start_row))
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.start_col == self.end_col && self.start_row == self.end_row
+    }
+}
+
 pub struct App {
     pub global_state: GlobalState,
     pub active_project_idx: Option<usize>,
@@ -53,6 +80,7 @@ pub struct App {
     pub sidebar_items: Vec<SidebarItem>,
     pub state_path: PathBuf,
     pub last_pty_size: (u16, u16),
+    pub selection: Option<SelectionState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,6 +138,8 @@ impl App {
             sidebar_items: Vec::new(),
             state_path,
             last_pty_size: (24, 80),
+            selection: None,
+
         };
         app.refresh_diff().await;
         app.reattach_tmux_sessions();
@@ -144,13 +174,16 @@ impl App {
             })
             .unwrap_or_default();
 
+        let mut created_sessions = Vec::new();
+
         for project in &self.global_state.projects {
             for workspace in project.workspaces.iter().filter(|w| {
                 !matches!(w.status, crate::state::WorkspaceStatus::Archived)
             }) {
                 for tab in &workspace.tabs {
-                    let tmux_name = crate::tmux::tab_session_name(&project.id, &workspace.name, tab.id);
-                    if !existing_sessions.contains(&tmux_name) && !crate::tmux::session_exists(&tmux_name) {
+                    let tmux_name =
+                        crate::tmux::tab_session_name(&project.id, &workspace.name, tab.id);
+                    if !existing_sessions.contains(&tmux_name) {
                         let program = tab_program(&tab.command);
                         let _ = crate::tmux::new_session(
                             &tmux_name,
@@ -159,17 +192,21 @@ impl App {
                             cols,
                             rows,
                         );
+                        created_sessions.push(tmux_name);
                     }
                 }
             }
         }
 
+        if !created_sessions.is_empty() {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+
         for project in &self.global_state.projects {
             for workspace in project.active() {
                 for tab in &workspace.tabs {
-                    let project_id = project.id.clone();
-                    let ws_name = workspace.name.clone();
-                    let tmux_name = crate::tmux::tab_session_name(&project_id, &ws_name, tab.id);
+                    let tmux_name =
+                        crate::tmux::tab_session_name(&project.id, &workspace.name, tab.id);
 
                     crate::tmux::resize_session(&tmux_name, cols, rows);
 
@@ -219,7 +256,9 @@ impl App {
                 Some(Ok(event)) = events.next() => {
                     self.handle_event(event).await;
                 }
-                _ = self.pty_manager.output_notify.notified() => {}
+                _ = self.pty_manager.output_notify.notified() => {
+                    tokio::time::sleep(Duration::from_millis(16)).await;
+                }
                 _ = refresh_tick.tick() => {
                     self.refresh_diff().await;
                 }
@@ -326,6 +365,7 @@ impl App {
             self.mode,
             true,
             ws_info.as_ref(),
+            self.selection.as_ref(),
         );
 
         self.draw_status_bar(frame, panes.status_bar);
@@ -440,27 +480,64 @@ impl App {
     }
 
     async fn handle_mouse(&mut self, mouse: MouseEvent) {
-        if self.mode == InputMode::Terminal {
-            if let Some(panes) = &self.last_panes {
-                let term_inner = Rect {
-                    x: panes.terminal.x + 1,
-                    y: panes.terminal.y + 2,
-                    width: panes.terminal.width.saturating_sub(2),
-                    height: panes.terminal.height.saturating_sub(3),
-                };
-                if rect_contains(term_inner, mouse.column, mouse.row) {
-                    let local_col = mouse.column - term_inner.x + 1;
-                    let local_row = mouse.row - term_inner.y + 1;
-                    if let Some(bytes) = mouse_to_sgr(&mouse, local_col, local_row) {
-                        self.write_active_tab_input(&bytes);
+        let in_terminal = self.last_panes.as_ref().is_some_and(|p| {
+            let inner = terminal_content_rect(p.terminal);
+            rect_contains(inner, mouse.column, mouse.row)
+        });
+
+        if self.mode == InputMode::Terminal && in_terminal {
+            match mouse.kind {
+                MouseEventKind::Down(MouseButton::Left) => {
+                    let inner = terminal_content_rect(self.last_panes.as_ref().unwrap().terminal);
+                    let col = mouse.column.saturating_sub(inner.x);
+                    let row = mouse.row.saturating_sub(inner.y);
+                    self.selection = Some(SelectionState {
+                        start_col: col,
+                        start_row: row,
+                        end_col: col,
+                        end_row: row,
+                        dragging: true,
+                    });
+                    return;
+                }
+                MouseEventKind::Drag(MouseButton::Left) => {
+                    if let Some(sel) = &mut self.selection {
+                        if sel.dragging {
+                            let inner = terminal_content_rect(self.last_panes.as_ref().unwrap().terminal);
+                            sel.end_col = mouse.column.saturating_sub(inner.x).min(inner.width.saturating_sub(1));
+                            sel.end_row = mouse.row.saturating_sub(inner.y).min(inner.height.saturating_sub(1));
+                            return;
+                        }
+                    }
+                }
+                MouseEventKind::Up(MouseButton::Left) => {
+                    if let Some(sel) = &mut self.selection {
+                        sel.dragging = false;
+                        if !sel.is_empty() {
+                            self.copy_selection_to_clipboard();
+                        } else {
+                            self.selection = None;
+                        }
                         return;
                     }
                 }
+                MouseEventKind::ScrollUp => {
+                    self.forward_scroll_to_pty(true);
+                    return;
+                }
+                MouseEventKind::ScrollDown => {
+                    self.forward_scroll_to_pty(false);
+                    return;
+                }
+                _ => return,
             }
         }
 
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
+                if self.selection.is_some() {
+                    self.selection = None;
+                }
                 self.handle_click(mouse.column, mouse.row).await;
             }
             MouseEventKind::ScrollUp => self.handle_scroll(mouse.column, mouse.row, -1),
@@ -638,6 +715,8 @@ impl App {
             self.forward_key_to_pty(&key);
             return;
         }
+
+
 
         if let Some(action) = self.keymap.resolve_normal(&key).cloned() {
             self.dispatch_action(action).await;
@@ -1136,6 +1215,42 @@ impl App {
         let _ = self.pty_manager.write_input(&project_id, &ws_name, tab_id, bytes);
     }
 
+    fn copy_selection_to_clipboard(&self) {
+        let Some(sel) = &self.selection else { return };
+        if sel.is_empty() {
+            return;
+        }
+
+        let sessions = self.active_sessions();
+        let Some((_, session)) = sessions.get(self.active_tab) else { return };
+        let Ok(parser) = session.parser.try_read() else { return };
+
+        let screen = parser.screen();
+        let ((sc, sr), (ec, er)) = sel.normalized();
+        let text = screen.contents_between(sr, sc, er, ec.saturating_add(1));
+        let trimmed = text.trim_end().to_string();
+
+        if trimmed.is_empty() {
+            return;
+        }
+
+        let _ = std::process::Command::new("pbcopy")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                use std::io::Write;
+                if let Some(stdin) = child.stdin.as_mut() {
+                    stdin.write_all(trimmed.as_bytes())?;
+                }
+                child.wait().map(|_| ())
+            });
+    }
+
+    fn forward_scroll_to_pty(&mut self, up: bool) {
+        let bytes: &[u8] = if up { b"\x1b[5~" } else { b"\x1b[6~" };
+        self.write_active_tab_input(bytes);
+    }
+
     fn forward_key_to_pty(&mut self, key: &KeyEvent) {
         let Some(bytes) = key_to_bytes(key) else { return };
         self.write_active_tab_input(&bytes);
@@ -1164,10 +1279,16 @@ impl App {
         let ws_name = workspace.name.clone();
         let _ = self.pty_manager.resize_all_for(&project_id, &ws_name, rows, cols);
 
-        for tab in &workspace.tabs {
-            let tmux_name = crate::tmux::tab_session_name(&project_id, &ws_name, tab.id);
-            crate::tmux::resize_session(&tmux_name, cols, rows);
-        }
+        let tab_tmux_names: Vec<String> = workspace
+            .tabs
+            .iter()
+            .map(|tab| crate::tmux::tab_session_name(&project_id, &ws_name, tab.id))
+            .collect();
+        tokio::task::spawn_blocking(move || {
+            for name in tab_tmux_names {
+                crate::tmux::resize_session(&name, cols, rows);
+            }
+        });
     }
 
     fn active_sessions(&self) -> Vec<(u32, &crate::pty::session::PtySession)> {
@@ -1410,21 +1531,13 @@ fn key_to_bytes(key: &KeyEvent) -> Option<Vec<u8>> {
     }
 }
 
-fn mouse_to_sgr(mouse: &MouseEvent, col: u16, row: u16) -> Option<Vec<u8>> {
-    let (button, press) = match mouse.kind {
-        MouseEventKind::Down(MouseButton::Left) => (0, true),
-        MouseEventKind::Down(MouseButton::Middle) => (1, true),
-        MouseEventKind::Down(MouseButton::Right) => (2, true),
-        MouseEventKind::Up(MouseButton::Left) => (0, false),
-        MouseEventKind::Up(MouseButton::Middle) => (1, false),
-        MouseEventKind::Up(MouseButton::Right) => (2, false),
-        MouseEventKind::ScrollUp => (64, true),
-        MouseEventKind::ScrollDown => (65, true),
-        MouseEventKind::Moved => (35, true),
-        _ => return None,
-    };
-    let suffix = if press { 'M' } else { 'm' };
-    Some(format!("\x1b[<{};{};{}{}", button, col, row, suffix).into_bytes())
+fn terminal_content_rect(terminal: Rect) -> Rect {
+    Rect {
+        x: terminal.x + 1,
+        y: terminal.y + 2,
+        width: terminal.width.saturating_sub(2),
+        height: terminal.height.saturating_sub(3),
+    }
 }
 
 fn tab_program(command: &str) -> String {

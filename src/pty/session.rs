@@ -68,7 +68,8 @@ impl PtySession {
         std::thread::spawn(move || {
             let mut reader = reader;
             let mut child = child;
-            let mut buf = [0u8; 4096];
+            let mut buf = [0u8; 16384];
+            let mut last_notify = std::time::Instant::now();
 
             loop {
                 match reader.read(&mut buf) {
@@ -88,10 +89,18 @@ impl PtySession {
                             parser.process(&buf[..n]);
                         }
                         if let Some(notify) = &output_notify {
-                            notify.notify_one();
+                            let now = std::time::Instant::now();
+                            if now.duration_since(last_notify).as_millis() >= 8 {
+                                notify.notify_one();
+                                last_notify = now;
+                            }
                         }
                     }
                 }
+            }
+
+            if let Some(notify) = &output_notify {
+                notify.notify_one();
             }
         });
 
