@@ -260,6 +260,7 @@ impl App {
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         let mut events = EventStream::new();
         let mut refresh_tick = interval(Duration::from_secs(5));
+        let mut status_tick = interval(Duration::from_secs(1));
 
         loop {
             terminal.draw(|frame| self.draw(frame))?;
@@ -287,6 +288,7 @@ impl App {
                     self.handle_event(event).await;
                 }
                 _ = self.pty_manager.output_notify.notified() => {}
+                _ = status_tick.tick() => {}
                 _ = refresh_tick.tick() => {
                     self.refresh_diff().await;
                 }
@@ -308,13 +310,17 @@ impl App {
     }
 
     async fn refresh_diff(&mut self) {
-        let Some(project) = self.active_project() else {
-            self.modified_files.clear();
-            self.right_list.select(None);
-            return;
+        let (path, base_branch) = match (self.active_project(), self.active_workspace()) {
+            (Some(_), Some(ws)) => (ws.worktree_path.clone(), ws.base_branch.clone()),
+            (Some(p), None) => (p.repo_root.clone(), p.base_branch.clone()),
+            _ => {
+                self.modified_files.clear();
+                self.right_list.select(None);
+                return;
+            }
         };
 
-        if let Ok(files) = diff::modified_files(project.repo_root.clone(), project.base_branch.clone()).await {
+        if let Ok(files) = diff::modified_files(path, base_branch).await {
             self.modified_files = files;
 
             if self.modified_files.is_empty() {
@@ -342,6 +348,7 @@ impl App {
         self.last_panes = Some(panes.clone());
 
         if let Some(left_rect) = panes.left {
+            let working_map = self.build_working_map();
             self.sidebar_items = crate::ui::sidebar_left::render(
                 frame,
                 left_rect,
@@ -350,6 +357,7 @@ impl App {
                 self.active_workspace_idx,
                 &mut self.left_list,
                 matches!(self.mode, InputMode::Normal),
+                &working_map,
             );
         } else {
             self.sidebar_items.clear();
@@ -505,7 +513,11 @@ impl App {
             Event::Mouse(mouse) => self.handle_mouse(mouse).await,
             Event::Paste(text) => {
                 if self.mode == InputMode::Terminal {
-                    self.write_active_tab_input(text.as_bytes());
+                    let mut buf = Vec::with_capacity(text.len() + 12);
+                    buf.extend_from_slice(b"\x1b[200~");
+                    buf.extend_from_slice(text.as_bytes());
+                    buf.extend_from_slice(b"\x1b[201~");
+                    self.write_active_tab_input(&buf);
                 }
             }
             Event::Resize(_, _) => {}
@@ -1243,6 +1255,7 @@ impl App {
                     self.switch_project(project_idx).await;
                 }
                 self.select_active_workspace(workspace_idx);
+                self.refresh_diff().await;
                 let has_tabs = self
                     .active_workspace()
                     .map(|ws| !ws.tabs.is_empty())
@@ -1283,6 +1296,7 @@ impl App {
                     self.switch_project(project_idx).await;
                 }
                 self.select_active_workspace(workspace_idx);
+                self.refresh_diff().await;
             }
             _ => {}
         }
@@ -1302,6 +1316,7 @@ impl App {
 
     fn select_active_workspace(&mut self, index: usize) {
         self.active_workspace_idx = Some(index);
+        self.right_list.select(None);
     }
 
     fn refresh_active_workspace_after_change(&mut self) {
@@ -1473,6 +1488,28 @@ impl App {
                 crate::tmux::resize_session(&name, cols, rows);
             }
         });
+    }
+
+    fn build_working_map(&self) -> std::collections::HashMap<(String, String), bool> {
+        use std::time::Duration;
+        let threshold = Duration::from_secs(2);
+        let mut map = std::collections::HashMap::new();
+
+        for project in &self.global_state.projects {
+            for workspace in project.active() {
+                if workspace.tabs.is_empty() {
+                    continue;
+                }
+                let any_working = workspace.tabs.iter().any(|tab| {
+                    self.pty_manager
+                        .get_session(&project.id, &workspace.name, tab.id)
+                        .map(|s| s.is_working(threshold))
+                        .unwrap_or(false)
+                });
+                map.insert((project.id.clone(), workspace.name.clone()), any_working);
+            }
+        }
+        map
     }
 
     fn active_sessions(&self) -> Vec<(u32, &crate::pty::session::PtySession)> {

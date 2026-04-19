@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-04-18
+
+### Added
+
+- Working/done indicator on each workspace in the sidebar: ⚡ when any tab had output in the last 2 seconds, ✓ otherwise
+- Bracketed paste forwarded to PTY — agents now detect large pastes and show `[Pasted N lines]` instead of rendering character by character
+
+### Fixed
+
+- Modified files sidebar now shows the diff for the active workspace's worktree, not the main repo
+
 ## [0.3.3] - 2026-04-18
 
 ### Added

@@ -1,7 +1,7 @@
 //! Left sidebar: project/workspace tree.
 
 use crate::app::SidebarItem;
-use crate::state::{GlobalState, WorkspaceStatus};
+use crate::state::GlobalState;
 use crate::ui::theme;
 use ratatui::{
     Frame,
@@ -11,6 +11,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
 };
 
+#[allow(clippy::too_many_arguments)]
 pub fn render(
     frame: &mut Frame,
     area: Rect,
@@ -19,6 +20,7 @@ pub fn render(
     _active_workspace_idx: Option<usize>,
     list_state: &mut ListState,
     focused: bool,
+    working_map: &std::collections::HashMap<(String, String), bool>,
 ) -> Vec<SidebarItem> {
     let border_style = if focused {
         Style::default().fg(theme::ACCENT_GOLD)
@@ -70,20 +72,20 @@ pub fn render(
 
             if project.expanded {
                 for (workspace_idx, ws) in project.active().enumerate() {
-                    let (icon, icon_style) = match &ws.status {
-                        WorkspaceStatus::Active => ("●", Style::default().fg(theme::ACCENT_SAGE)),
-                        WorkspaceStatus::Inactive => ("○", Style::default().fg(theme::TEXT_MUTED)),
-                        WorkspaceStatus::Exited(_) => {
-                            ("◐", Style::default().fg(theme::ACCENT_TERRA))
-                        }
-                        WorkspaceStatus::Archived => ("⋯", Style::default().fg(theme::TEXT_DIM)),
+                    let key = (project.id.clone(), ws.name.clone());
+                    let is_working = working_map.get(&key).copied().unwrap_or(false);
+                    let (state_icon, state_style) = if is_working {
+                        ("⚡", Style::default().fg(theme::ACCENT_GOLD))
+                    } else {
+                        ("✓", Style::default().fg(theme::ACCENT_SAGE))
                     };
+
                     let inner_w = area.width.saturating_sub(2) as usize;
                     let left_len = 2 + 1 + 1 + ws.name.len();
                     let pad = inner_w.saturating_sub(left_len + 1);
                     items.push(ListItem::new(Line::from(vec![
                         Span::raw("  "),
-                        Span::styled(icon, icon_style),
+                        Span::styled(state_icon, state_style),
                         Span::raw(" "),
                         Span::styled(ws.name.clone(), Style::default().fg(theme::TEXT_PRIMARY)),
                         Span::raw(" ".repeat(pad)),
@@ -176,6 +178,7 @@ mod tests {
                     Some(0),
                     &mut list_state,
                     true,
+                    &std::collections::HashMap::new(),
                 );
                 assert!(!items.is_empty());
             })
@@ -197,7 +200,7 @@ mod tests {
         let mut list_state = ListState::default();
         terminal
             .draw(|f| {
-                render(f, f.area(), &state, None, None, &mut list_state, false);
+                render(f, f.area(), &state, None, None, &mut list_state, false, &std::collections::HashMap::new());
             })
             .unwrap();
         let buf = terminal.backend().buffer().clone();

@@ -22,6 +22,7 @@ pub struct PtySession {
     writer: Option<Box<dyn Write + Send>>,
     status: Arc<Mutex<PtyStatus>>,
     pub exit_rx: Option<oneshot::Receiver<i32>>,
+    pub last_output: Arc<Mutex<std::time::Instant>>,
 }
 
 impl PtySession {
@@ -63,6 +64,9 @@ impl PtySession {
         let status = Arc::new(Mutex::new(PtyStatus::Running));
         let status_clone = Arc::clone(&status);
 
+        let last_output = Arc::new(Mutex::new(std::time::Instant::now()));
+        let last_output_clone = Arc::clone(&last_output);
+
         let (exit_tx, exit_rx) = oneshot::channel::<i32>();
 
         std::thread::spawn(move || {
@@ -88,6 +92,7 @@ impl PtySession {
                         if let Ok(mut parser) = parser_clone.write() {
                             parser.process(&buf[..n]);
                         }
+                        *last_output_clone.lock().unwrap() = std::time::Instant::now();
                         if let Some(notify) = &output_notify {
                             let now = std::time::Instant::now();
                             if now.duration_since(last_notify).as_millis() >= 8 {
@@ -111,11 +116,19 @@ impl PtySession {
             writer: Some(writer),
             status,
             exit_rx: Some(exit_rx),
+            last_output,
         })
     }
 
     pub fn is_exited(&self) -> bool {
         matches!(*self.status.lock().unwrap(), PtyStatus::Exited(_))
+    }
+
+    pub fn is_working(&self, threshold: std::time::Duration) -> bool {
+        self.last_output
+            .lock()
+            .map(|t| t.elapsed() < threshold)
+            .unwrap_or(false)
     }
 
     pub fn write_input(&mut self, data: &[u8]) -> Result<()> {
