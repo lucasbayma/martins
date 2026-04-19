@@ -84,7 +84,6 @@ Once inside:
 | `d` | Delete workspace |
 | `a` | Archive workspace |
 | `p` | Preview file |
-| `e` | Edit file in $EDITOR |
 | `[` / `]` | Toggle sidebars |
 | `?` | Show help |
 | `q` | Quit |

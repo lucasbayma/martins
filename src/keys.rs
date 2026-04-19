@@ -36,7 +36,6 @@ pub enum Action {
     ExitTerminalMode,
     ShowHelp,
     Preview,
-    Edit,
     AddProject,
     ClickProject(usize),
     ClickWorkspace(usize, usize),
@@ -133,7 +132,6 @@ impl Keymap {
             Action::ShowHelp,
         );
         normal.insert(key(KeyCode::Char('p'), KeyModifiers::NONE), Action::Preview);
-        normal.insert(key(KeyCode::Char('e'), KeyModifiers::NONE), Action::Edit);
 
         // Sidebar toggles
         normal.insert(

@@ -1208,19 +1208,6 @@ impl App {
                     self.preview_lines = Some((full_path, lines));
                 }
             }
-            Action::Edit => {
-                if let (Some(project), Some(index)) = (self.active_project(), self.right_list.selected())
-                    && let Some(entry) = self.modified_files.get(index)
-                {
-                    let full_path = project.repo_root.join(&entry.path);
-                    let _ = crate::editor::open_in_editor(&full_path);
-                    let _ = crossterm::terminal::enable_raw_mode();
-                    let _ = crossterm::execute!(
-                        std::io::stdout(),
-                        crossterm::terminal::EnterAlternateScreen
-                    );
-                }
-            }
             Action::UnarchiveWorkspace => {}
             Action::DeleteWorkspace => {
                 if let Some(idx) = self.active_workspace_idx {
@@ -1261,7 +1248,7 @@ impl App {
                     .map(|ws| !ws.tabs.is_empty())
                     .unwrap_or(false);
                 if has_tabs {
-                    self.mode = InputMode::Normal;
+                    self.mode = InputMode::Terminal;
                 } else {
                     self.open_new_tab_picker();
                 }
@@ -1553,6 +1540,8 @@ impl App {
         self.active_workspace_idx = active_count.checked_sub(1);
         self.active_tab = 0;
         self.save_state();
+
+        let _ = self.create_tab("shell".to_string()).await;
         Ok(())
     }
 

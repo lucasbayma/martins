@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-04-18
+
+### Added
+
+- New workspaces now auto-create a shell tab — no manual tab creation needed for the first terminal
+
+### Changed
+
+- Clicking a workspace with tabs focuses the terminal pane (previously stayed on sidebar)
+
+### Fixed
+
+- Removed `e` keybinding that launched `$EDITOR` in the outer terminal, causing screen corruption when the editor exited. File editing should be done through the agent.
+
 ## [0.3.2] - 2026-04-18
 
 ### Fixed

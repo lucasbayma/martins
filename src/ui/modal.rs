@@ -576,7 +576,6 @@ fn render_help(frame: &mut Frame) {
         shortcut("]", "Toggle right sidebar"),
         shortcut("/", "Fuzzy search workspaces"),
         shortcut("p", "Preview file"),
-        shortcut("e", "Edit file in $EDITOR"),
         Line::from(""),
         Line::from(vec![
             Span::styled("[Esc]", Style::default().fg(theme::TEXT_PRIMARY)),
