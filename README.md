@@ -84,7 +84,7 @@ Once inside:
 | `d` | Delete workspace |
 | `a` | Archive workspace |
 | `p` | Preview file |
-| `[` / `]` | Toggle sidebars |
+| `[` / `]` | Toggle sidebars (Normal mode) |
 | `?` | Show help |
 | `q` | Quit |
 

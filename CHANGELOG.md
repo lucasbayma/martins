@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-19
+
+### Added
+
+- Click a file in the modified files sidebar to open a diff tab in the workspace. The tab runs `git diff --color=always <file> | less -R` in the worktree
+- Diff tab also works for untracked (new) files — shows the full content as additions via `git diff --no-index`
+
+### Fixed
+
+- Terminal scroll is now instant and precise — uses native SGR mouse events directly to PTY instead of `tmux send-keys` subprocess (no more lag or jumpy scrolling)
+- Clicking a file with scrollback no longer opens the wrong file — click mapping now uses absolute index (offset + visible row)
+- Tab close click (the `✕` icon) now lines up correctly with tab labels that differ from command (e.g. `diff:app.rs`)
+- Added 200ms delay between tmux session creation and initial command send to avoid shell init race
+
+### Changed
+
+- Sidebar toggle back to `[` / `]` (Normal mode) — simpler than `Ctrl+B/N` which conflicted with other bindings
+- Help modal updated to reflect current shortcuts
+
 ## [0.3.4] - 2026-04-18
 
 ### Added

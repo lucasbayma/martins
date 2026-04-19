@@ -586,18 +586,12 @@ impl App {
         let Some(panes) = &self.last_panes else { return };
 
         if rect_contains(panes.terminal, col, row) {
-            if let Some(project) = self.active_project() {
-                if let Some(workspace) = self.active_workspace() {
-                    let sessions = self.active_sessions();
-                    if let Some((tab_id, _)) = sessions.get(self.active_tab) {
-                        let tmux_name = crate::tmux::tab_session_name(
-                            &project.id, &workspace.name, *tab_id,
-                        );
-                        let key = if delta < 0 { "PageUp" } else { "PageDown" };
-                        crate::tmux::send_key(&tmux_name, key);
-                    }
-                }
-            }
+            let inner = terminal_content_rect(panes.terminal);
+            let local_col = col.saturating_sub(inner.x).saturating_add(1).max(1);
+            let local_row = row.saturating_sub(inner.y).saturating_add(1).max(1);
+            let button: u8 = if delta < 0 { 64 } else { 65 };
+            let seq = format!("\x1b[<{button};{local_col};{local_row}M");
+            self.write_active_tab_input(seq.as_bytes());
             return;
         }
 
@@ -711,8 +705,10 @@ impl App {
             && row < right.y + right.height - 1
         {
             let local_row = (row - right.y - 1) as usize;
-            if local_row < self.modified_files.len() {
-                self.dispatch_action(Action::ClickFile(local_row)).await;
+            let offset = self.right_list.offset();
+            let absolute_idx = offset + local_row;
+            if absolute_idx < self.modified_files.len() {
+                self.dispatch_action(Action::ClickFile(absolute_idx)).await;
             }
             return;
         }
@@ -748,6 +744,8 @@ impl App {
                 return;
             }
         }
+
+
 
         if let Some(picker) = &mut self.picker {
             let outcome = picker.on_key(key);
@@ -1272,6 +1270,12 @@ impl App {
             }
             Action::ClickFile(idx) => {
                 self.right_list.select(Some(idx));
+                if let Some(entry) = self.modified_files.get(idx).cloned() {
+                    let path = entry.path.to_string_lossy().to_string();
+                    if let Err(error) = self.create_tab(format!("diff {}", path)).await {
+                        tracing::warn!("failed to open diff tab: {error}");
+                    }
+                }
             }
             Action::ToggleProjectExpand(idx) => {
                 if let Some(project) = self.global_state.projects.get_mut(idx) {
@@ -1666,7 +1670,8 @@ impl App {
         let workspace = self.active_workspace()?;
         let mut current_col = terminal.x;
         for (idx, tab) in workspace.tabs.iter().enumerate() {
-            let width = format!(" {} ✕ ", tab.command).chars().count() as u16;
+            let label = crate::ui::terminal::tab_label(&tab.command);
+            let width = format!(" {label} ✕ ").chars().count() as u16;
             if col >= current_col && col < current_col + width {
                 let close_start = current_col + width.saturating_sub(2);
                 return if col >= close_start {
@@ -1795,6 +1800,14 @@ fn terminal_content_rect(terminal: Rect) -> Rect {
 }
 
 fn tab_program_for_new(command: &str) -> String {
+    if let Some(path) = command.strip_prefix("diff ") {
+        let escaped = path.replace('\'', "'\\''");
+        return format!(
+            "(git diff --color=always -- '{escaped}' 2>/dev/null; \
+             if [ -f '{escaped}' ] && ! git ls-files --error-unmatch '{escaped}' >/dev/null 2>&1; then \
+             git diff --no-index --color=always /dev/null '{escaped}' 2>/dev/null; fi) | less -R"
+        );
+    }
     match command {
         "shell" => {
             if Path::new("/bin/zsh").exists() {
@@ -1808,6 +1821,9 @@ fn tab_program_for_new(command: &str) -> String {
 }
 
 fn tab_program_for_resume(command: &str) -> String {
+    if command.starts_with("diff ") {
+        return tab_program_for_new(command);
+    }
     match command {
         "shell" => tab_program_for_new(command),
         "opencode" => "opencode -c".to_string(),

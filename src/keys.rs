@@ -135,11 +135,11 @@ impl Keymap {
 
         // Sidebar toggles
         normal.insert(
-            KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Char('['), KeyModifiers::NONE),
             Action::ToggleSidebarLeft,
         );
         normal.insert(
-            KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Char(']'), KeyModifiers::NONE),
             Action::ToggleSidebarRight,
         );
 

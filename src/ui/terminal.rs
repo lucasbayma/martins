@@ -3,6 +3,18 @@
 #![allow(dead_code)]
 
 use crate::app::SelectionState;
+
+pub fn tab_label(command: &str) -> String {
+    if let Some(path) = command.strip_prefix("diff ") {
+        let filename = std::path::Path::new(path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(path);
+        format!("diff:{filename}")
+    } else {
+        command.to_string()
+    }
+}
 use crate::keys::InputMode;
 use crate::pty::session::PtySession;
 use crate::state::TabSpec;
@@ -98,8 +110,9 @@ pub fn render(
                 Style::default().fg(color)
             };
 
+            let label = tab_label(&tab_spec.command);
             [
-                Span::styled(format!(" {}", tab_spec.command), base_style),
+                Span::styled(format!(" {label}"), base_style),
                 Span::styled(" ✕ ", Style::default().fg(theme::TEXT_DIM)),
             ]
         })

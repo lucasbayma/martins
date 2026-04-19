@@ -88,6 +88,8 @@ pub fn new_session(
 
     enforce_session_options(name);
 
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
     let _ = Command::new("tmux")
         .args(["send-keys", "-t", name, program, "Enter"])
         .stdout(std::process::Stdio::null())
