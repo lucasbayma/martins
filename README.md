@@ -1,5 +1,21 @@
 <p align="center">
+  <a href="https://github.com/lucasbayma/martins/releases"><img src="https://img.shields.io/github/v/release/lucasbayma/martins?color=gold&label=release" alt="Release" /></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-1.85%2B-orange?logo=rust" alt="Rust" /></a>
+  <img src="https://img.shields.io/badge/os-macOS-lightgrey?logo=apple" alt="macOS only" />
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/lucasbayma/martins?color=blue" alt="License" /></a>
+  <a href="https://github.com/lucasbayma/martins/stargazers"><img src="https://img.shields.io/github/stars/lucasbayma/martins?style=flat&color=yellow" alt="Stars" /></a>
+</p>
+
+<p align="center">
   <img src="resources/martins.png" width="1000" alt="João Carlos Martins" />
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#usage">Usage</a> ·
+  <a href="#keyboard-shortcuts">Keyboard Shortcuts</a> ·
+  <a href="#architecture--stack">Architecture</a> ·
+  <a href="#contributing">Contributing</a>
 </p>
 
 # Martins
