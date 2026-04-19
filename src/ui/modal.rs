@@ -124,6 +124,12 @@ pub struct ArchiveForm {
     pub workspace_name: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct CommandArgsForm {
+    pub agent: String,
+    pub args_input: String,
+}
+
 #[derive(Debug, Clone, Default)]
 pub enum Modal {
     #[default]
@@ -134,6 +140,7 @@ pub enum Modal {
     ConfirmArchive(ArchiveForm),
     ConfirmRemoveProject(RemoveProjectForm),
     AddProject(AddProjectForm),
+    CommandArgs(CommandArgsForm),
     Help,
     Loading(String),
 }
@@ -167,6 +174,7 @@ pub fn render(frame: &mut Frame, modal: &Modal) {
         Modal::ConfirmArchive(form) => render_confirm_archive(frame, form),
         Modal::ConfirmRemoveProject(form) => render_confirm_remove_project(frame, form),
         Modal::AddProject(form) => render_add_project(frame, form),
+        Modal::CommandArgs(form) => render_command_args(frame, form),
         Modal::Help => render_help(frame),
         Modal::Loading(msg) => render_loading(frame, msg),
     }
@@ -240,6 +248,43 @@ fn render_new_workspace(frame: &mut Frame, form: &NewWorkspaceForm) {
         Span::styled("[↵] Create  ", Style::default().fg(theme::ACCENT_GOLD)),
         Span::styled("[Esc] Cancel", Style::default().fg(theme::TEXT_MUTED)),
     ]));
+
+    let para = Paragraph::new(lines).block(block);
+    frame.render_widget(para, area);
+}
+
+fn render_command_args(frame: &mut Frame, form: &CommandArgsForm) {
+    let area = centered_rect(50, 30, frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(format!(" {} ", form.agent.to_uppercase()))
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme::ACCENT_GOLD));
+
+    let display_args = if form.args_input.is_empty() {
+        "[none]".to_string()
+    } else {
+        form.args_input.clone()
+    };
+
+    let lines = vec![
+        Line::from(vec![
+            Span::styled("Extra args: ", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(display_args, Style::default().fg(theme::TEXT_PRIMARY)),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "e.g. --model gpt-4o",
+            Style::default().fg(theme::TEXT_MUTED),
+        )]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("[↵] Create  ", Style::default().fg(theme::ACCENT_GOLD)),
+            Span::styled("[Esc] Cancel", Style::default().fg(theme::TEXT_MUTED)),
+        ]),
+    ];
 
     let para = Paragraph::new(lines).block(block);
     frame.render_widget(para, area);

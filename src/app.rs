@@ -5,7 +5,7 @@ use crate::keys::{Action, InputMode, Keymap};
 use crate::pty::manager::PtyManager;
 use crate::state::{Agent, GlobalState, Project, TabSpec, Workspace};
 use crate::ui::layout::{self, LayoutState, PaneRects};
-use crate::ui::modal::{self, AddProjectForm, Modal, NewWorkspaceForm};
+use crate::ui::modal::{self, AddProjectForm, CommandArgsForm, Modal, NewWorkspaceForm};
 use crate::ui::picker::{self, Picker, PickerKind, PickerOutcome};
 use crate::ui::preview;
 use anyhow::Result;
@@ -605,11 +605,11 @@ impl App {
         if let Some(left) = panes.left
             && rect_contains(left, col, row)
         {
-            move_list_selection(&mut self.left_list, self.sidebar_items.len(), delta);
+            move_sidebar_to_workspace(&mut self.left_list, &self.sidebar_items, delta);
             return;
         }
 
-        move_list_selection(&mut self.left_list, self.sidebar_items.len(), delta);
+        move_sidebar_to_workspace(&mut self.left_list, &self.sidebar_items, delta);
     }
 
     async fn handle_click(&mut self, col: u16, row: u16) {
@@ -873,6 +873,28 @@ impl App {
                 }
                 _ => self.modal = Modal::ConfirmRemoveProject(form),
             },
+            Modal::CommandArgs(mut form) => match key.code {
+                KeyCode::Esc => self.modal = Modal::None,
+                KeyCode::Enter => {
+                    let command = if form.args_input.trim().is_empty() {
+                        form.agent.clone()
+                    } else {
+                        format!("{} {}", form.agent, form.args_input.trim())
+                    };
+                    if let Err(error) = self.create_tab(command).await {
+                        tracing::error!("failed to create tab: {error}");
+                    }
+                }
+                KeyCode::Backspace => {
+                    form.args_input.pop();
+                    self.modal = Modal::CommandArgs(form);
+                }
+                KeyCode::Char(c) => {
+                    form.args_input.push(c);
+                    self.modal = Modal::CommandArgs(form);
+                }
+                _ => self.modal = Modal::CommandArgs(form),
+            },
             Modal::Help => {
                 if matches!(key.code, KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('?')) {
                     self.modal = Modal::None;
@@ -1042,6 +1064,31 @@ impl App {
                 }
                 true
             }
+            Modal::CommandArgs(form) => {
+                let modal_area = crate::ui::modal::centered_rect(50, 30, frame_area);
+                if !rect_contains(modal_area, col, row) {
+                    self.modal = Modal::None;
+                    return true;
+                }
+
+                if row == modal_button_row_y(modal_area) {
+                    if is_modal_first_button(modal_area, col, 12) {
+                        let command = if form.args_input.trim().is_empty() {
+                            form.agent.clone()
+                        } else {
+                            format!("{} {}", form.agent, form.args_input.trim())
+                        };
+                        if let Err(error) = self.create_tab(command).await {
+                            tracing::error!("failed to create tab: {error}");
+                        }
+                    } else {
+                        self.modal = Modal::None;
+                    }
+                } else {
+                    self.modal = Modal::CommandArgs(form);
+                }
+                true
+            }
             _ => false,
         }
     }
@@ -1078,16 +1125,25 @@ impl App {
             PickerOutcome::Cancelled => self.picker = None,
             PickerOutcome::Selected(index) => {
                 let kind = self.picker.as_ref().map(|picker| picker.kind.clone());
+                let picked_item = self
+                    .picker
+                    .as_ref()
+                    .and_then(|p| p.items.get(index).cloned());
                 self.picker = None;
                 match kind {
                     Some(PickerKind::Workspaces) => self.select_active_workspace(index),
                     Some(PickerKind::NewTab) => {
-                        if let Some(command) = ["opencode", "claude", "codex", "shell"]
-                            .get(index)
-                            .map(|command| (*command).to_string())
-                            && let Err(error) = self.create_tab(command).await
-                        {
-                            tracing::error!("failed to create tab: {error}");
+                        if let Some(command) = picked_item {
+                            if command == "shell" {
+                                if let Err(error) = self.create_tab("shell".to_string()).await {
+                                    tracing::error!("failed to create tab: {error}");
+                                }
+                            } else {
+                                self.modal = Modal::CommandArgs(CommandArgsForm {
+                                    agent: command,
+                                    args_input: String::new(),
+                                });
+                            }
                         }
                     }
                     Some(PickerKind::ModifiedFiles) | None => {}
@@ -1101,19 +1157,16 @@ impl App {
         match action {
             Action::Quit => self.modal = Modal::ConfirmQuit,
             Action::NextItem => {
-                let len = self.sidebar_items.len();
-                if len > 0 {
-                    let current = self.left_list.selected().unwrap_or(0);
-                    let next = (current + 1).min(len - 1);
-                    self.left_list.select(Some(next));
-                    self.activate_sidebar_item(next).await;
+                move_sidebar_to_workspace(&mut self.left_list, &self.sidebar_items, 1);
+                if let Some(idx) = self.left_list.selected() {
+                    self.activate_sidebar_item(idx).await;
                 }
             }
             Action::PrevItem => {
-                let current = self.left_list.selected().unwrap_or(0);
-                let prev = current.saturating_sub(1);
-                self.left_list.select(Some(prev));
-                self.activate_sidebar_item(prev).await;
+                move_sidebar_to_workspace(&mut self.left_list, &self.sidebar_items, -1);
+                if let Some(idx) = self.left_list.selected() {
+                    self.activate_sidebar_item(idx).await;
+                }
             }
             Action::EnterSelected => {
                 let has_tabs = self
@@ -1312,6 +1365,11 @@ impl App {
                 "opencode".to_string(),
                 "claude".to_string(),
                 "codex".to_string(),
+                "aider".to_string(),
+                "gemini".to_string(),
+                "amp".to_string(),
+                "goose".to_string(),
+                "cline".to_string(),
                 "shell".to_string(),
             ],
             PickerKind::NewTab,
@@ -1722,6 +1780,28 @@ fn move_list_selection(list: &mut ListState, len: usize, delta: isize) {
     let current = list.selected().unwrap_or(0) as isize;
     let next = (current + delta).clamp(0, len.saturating_sub(1) as isize) as usize;
     list.select(Some(next));
+}
+
+fn move_sidebar_to_workspace(
+    list: &mut ListState,
+    items: &[SidebarItem],
+    delta: isize,
+) {
+    if items.is_empty() {
+        list.select(None);
+        return;
+    }
+    let current = list.selected().unwrap_or(0) as isize;
+    let step = if delta > 0 { 1isize } else { -1 };
+    let len = items.len() as isize;
+    let mut pos = current + step;
+    while pos >= 0 && pos < len {
+        if matches!(items[pos as usize], SidebarItem::Workspace(_, _)) {
+            list.select(Some(pos as usize));
+            return;
+        }
+        pos += step;
+    }
 }
 
 fn menu_action_at_column(col: u16) -> Option<Action> {
