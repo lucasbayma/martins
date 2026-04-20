@@ -1,5 +1,6 @@
 mod agents;
 mod app;
+mod cli;
 mod config;
 mod editor;
 mod error;
@@ -15,11 +16,17 @@ mod ui;
 mod watcher;
 
 use anyhow::Result;
+use clap::Parser;
 use crossterm::{event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture}, execute};
-use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let parsed = cli::Cli::parse();
+
+    if let Some(cmd) = parsed.command {
+        return cli::run(cmd);
+    }
+
     let log_dir = config::global_log_dir();
     let _ = logging::init_logging(&log_dir);
     logging::install_panic_hook();
@@ -41,8 +48,8 @@ async fn main() -> Result<()> {
         }
     }
 
-    if let Some(path) = std::env::args().nth(1) {
-        let repo_root = crate::git::repo::discover(&PathBuf::from(path))?;
+    if let Some(path) = parsed.path {
+        let repo_root = crate::git::repo::discover(&path)?;
         let base_branch = crate::git::repo::current_branch_async(repo_root.clone())
             .await
             .unwrap_or_else(|_| "main".to_string());

@@ -22,6 +22,10 @@ pub fn global_log_dir() -> PathBuf {
     martins_home().join("logs")
 }
 
+pub fn global_workspaces_dir() -> PathBuf {
+    martins_home().join("workspaces")
+}
+
 #[allow(dead_code)]
 pub enum GitignoreAction {
     NoChange,
