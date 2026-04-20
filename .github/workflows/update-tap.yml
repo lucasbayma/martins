@@ -13,8 +13,8 @@ jobs:
         with:
           formula-name: martins
           formula-path: Formula/martins.rb
-          homebrew-tap: bayma/homebrew-martins
+          homebrew-tap: lucasbayma/homebrew-martins
           tag-name: ${{ github.ref_name }}
-          download-url: https://github.com/bayma/martins/releases/download/${{ github.ref_name }}/martins-macos-universal
+          download-url: https://github.com/lucasbayma/martins/releases/download/${{ github.ref_name }}/martins-macos-universal
         env:
           COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
