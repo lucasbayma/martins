@@ -36,6 +36,7 @@ tracing-appender = "0.2"
 anyhow = "1"
 thiserror = "1"
 clap = { version = "4", features = ["derive"] }
+openssl = { version = "0.10", features = ["vendored"] }
 
 [dev-dependencies]
 insta = "1.40"
