@@ -1,11 +1,11 @@
 class Martins < Formula
   desc "Terminal workspace manager for AI coding agents"
   homepage "https://github.com/lucasbayma/martins"
-  version "0.6.0"
+  version "0.7.0"
   license "MIT"
 
   url "https://github.com/lucasbayma/martins/releases/download/v#{version}/martins-macos-universal"
-  sha256 "db11946abe869d9f2b609e69f9da62234aff2e1bec80dc88caec2cfca583baa3"
+  sha256 "4d0a78210728d83edfedc51ce3b4fca14bb4f1c4bb962113a58aea6715b099b8"
 
   depends_on :macos
   depends_on "tmux"
