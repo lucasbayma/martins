@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use std::collections::HashSet;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -7,10 +7,13 @@ use crate::config;
 use crate::state::{GlobalState, WorkspaceStatus};
 
 #[derive(Parser)]
-#[command(name = "martins", version, about = "Terminal workspace manager for AI coding agents orchestration")]
+#[command(name = "martins", version, disable_version_flag = true, about = "Terminal workspace manager for AI coding agents orchestration")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
+
+    #[arg(short = 'v', long = "version", action = ArgAction::Version)]
+    pub version: Option<bool>,
 
     /// Path to a git repository to open
     pub path: Option<PathBuf>,
