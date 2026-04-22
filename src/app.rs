@@ -29,6 +29,8 @@ pub enum SidebarItem {
     Workspace(usize, usize),
     AddProject,
     NewWorkspace(usize),
+    ArchivedHeader(usize),
+    ArchivedWorkspace(usize, usize),
 }
 
 
@@ -83,6 +85,7 @@ pub struct App {
     pub selection: Option<SelectionState>,
     pub last_frame_area: Rect,
     pub pending_workspace: Option<Option<String>>,
+    pub archived_expanded: std::collections::HashSet<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -143,7 +146,7 @@ impl App {
             selection: None,
             last_frame_area: Rect::default(),
             pending_workspace: None,
-
+            archived_expanded: std::collections::HashSet::new(),
         };
         app.refresh_diff().await;
         app.reattach_tmux_sessions();
@@ -358,6 +361,7 @@ impl App {
                 &mut self.left_list,
                 matches!(self.mode, InputMode::Normal),
                 &working_map,
+                &self.archived_expanded,
             );
         } else {
             self.sidebar_items.clear();
@@ -684,9 +688,23 @@ impl App {
                                 self.switch_project(project_idx).await;
                             }
                             self.select_active_workspace(workspace_idx);
-                            self.dispatch_action(Action::DeleteWorkspace).await;
+                            self.archive_active_workspace();
                         } else {
                             self.dispatch_action(Action::ClickWorkspace(project_idx, workspace_idx)).await;
+                        }
+                    }
+                    SidebarItem::ArchivedHeader(project_idx) => {
+                        if let Some(project) = self.global_state.projects.get(project_idx) {
+                            let id = project.id.clone();
+                            if !self.archived_expanded.remove(&id) {
+                                self.archived_expanded.insert(id);
+                            }
+                        }
+                    }
+                    SidebarItem::ArchivedWorkspace(project_idx, archived_idx) => {
+                        let delete_zone_start = left.x + left.width.saturating_sub(4);
+                        if col >= delete_zone_start {
+                            self.delete_archived_workspace(project_idx, archived_idx);
                         }
                     }
                     SidebarItem::AddProject => self.dispatch_action(Action::AddProject).await,
@@ -1253,14 +1271,7 @@ impl App {
                     self.modal = Modal::AddProject(AddProjectForm::default());
                     return;
                 }
-                if let Some(name) = self
-                    .active_workspace()
-                    .map(|ws| ws.name.clone())
-                {
-                    self.modal = Modal::ConfirmArchive(crate::ui::modal::ArchiveForm {
-                        workspace_name: name,
-                    });
-                }
+                self.archive_active_workspace();
             }
             Action::Preview => {
                 if let (Some(project), Some(index)) = (self.active_project(), self.right_list.selected())
@@ -1436,6 +1447,43 @@ impl App {
             project.remove(&name);
         }
         self.refresh_active_workspace_after_change();
+        self.save_state();
+    }
+
+    fn archive_active_workspace(&mut self) {
+        let Some(ws) = self.active_workspace() else { return };
+        let ws_name = ws.name.clone();
+        let worktree_path = ws.worktree_path.clone();
+        let tab_ids: Vec<u32> = ws.tabs.iter().map(|t| t.id).collect();
+        let Some(project) = self.active_project() else { return };
+        let project_id = project.id.clone();
+
+        for tab_id in &tab_ids {
+            let tmux_name = crate::tmux::tab_session_name(&project_id, &ws_name, *tab_id);
+            crate::tmux::kill_session(&tmux_name);
+            self.pty_manager.close_tab(&project_id, &ws_name, *tab_id);
+        }
+
+        if let Some(project) = self.active_project_mut() {
+            project.archive(&ws_name);
+        }
+        self.refresh_active_workspace_after_change();
+        self.save_state();
+
+        let _ = std::fs::remove_dir_all(&worktree_path);
+    }
+
+    fn delete_archived_workspace(&mut self, project_idx: usize, archived_idx: usize) {
+        let Some(project) = self.global_state.projects.get(project_idx) else { return };
+        let Some(ws) = project.archived().nth(archived_idx) else { return };
+        let ws_name = ws.name.clone();
+        let worktree_path = ws.worktree_path.clone();
+
+        if let Some(project) = self.global_state.projects.get_mut(project_idx) {
+            project.delete_workspace(&ws_name);
+        }
+
+        let _ = std::fs::remove_dir_all(&worktree_path);
         self.save_state();
     }
 

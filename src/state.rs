@@ -14,6 +14,7 @@ pub enum WorkspaceStatus {
     Active,
     Inactive,
     Archived,
+    Deleted,
     Exited(i32),
 }
 
@@ -110,6 +111,12 @@ impl Project {
         self.workspaces
             .iter()
             .filter(|w| matches!(w.status, WorkspaceStatus::Archived))
+    }
+
+    pub fn delete_workspace(&mut self, name: &str) {
+        if let Some(ws) = self.workspaces.iter_mut().find(|w| w.name == name) {
+            ws.status = WorkspaceStatus::Deleted;
+        }
     }
 
     pub fn used_names(&self) -> HashSet<String> {

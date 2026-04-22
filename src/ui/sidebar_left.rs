@@ -21,6 +21,7 @@ pub fn render(
     list_state: &mut ListState,
     focused: bool,
     working_map: &std::collections::HashMap<(String, String), bool>,
+    archived_expanded: &std::collections::HashSet<String>,
 ) -> Vec<SidebarItem> {
     let border_style = if focused {
         Style::default().fg(theme::ACCENT_GOLD)
@@ -102,6 +103,38 @@ pub fn render(
                     ),
                 ])));
                 sidebar_items.push(SidebarItem::NewWorkspace(project_idx));
+
+                let archived_count = project.archived().count();
+                if archived_count > 0 {
+                    let is_expanded = archived_expanded.contains(&project.id);
+                    let arrow = if is_expanded { "▼" } else { "▶" };
+                    items.push(ListItem::new(Line::from(vec![
+                        Span::raw("  "),
+                        Span::styled(
+                            format!("{} Archived ({})", arrow, archived_count),
+                            Style::default().fg(theme::TEXT_DIM),
+                        ),
+                    ])));
+                    sidebar_items.push(SidebarItem::ArchivedHeader(project_idx));
+
+                    if is_expanded {
+                        for (archived_idx, ws) in project.archived().enumerate() {
+                            let inner_w = area.width.saturating_sub(2) as usize;
+                            let left_len = 4 + ws.name.len();
+                            let pad = inner_w.saturating_sub(left_len + 1);
+                            items.push(ListItem::new(Line::from(vec![
+                                Span::raw("    "),
+                                Span::styled(
+                                    ws.name.clone(),
+                                    Style::default().fg(theme::TEXT_DIM),
+                                ),
+                                Span::raw(" ".repeat(pad)),
+                                Span::styled("✕", Style::default().fg(theme::ACCENT_TERRA)),
+                            ])));
+                            sidebar_items.push(SidebarItem::ArchivedWorkspace(project_idx, archived_idx));
+                        }
+                    }
+                }
             }
         }
 
@@ -179,6 +212,7 @@ mod tests {
                     &mut list_state,
                     true,
                     &std::collections::HashMap::new(),
+                    &std::collections::HashSet::new(),
                 );
                 assert!(!items.is_empty());
             })
@@ -200,7 +234,7 @@ mod tests {
         let mut list_state = ListState::default();
         terminal
             .draw(|f| {
-                render(f, f.area(), &state, None, None, &mut list_state, false, &std::collections::HashMap::new());
+                render(f, f.area(), &state, None, None, &mut list_state, false, &std::collections::HashMap::new(), &std::collections::HashSet::new());
             })
             .unwrap();
         let buf = terminal.backend().buffer().clone();
