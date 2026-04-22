@@ -1,12 +1,13 @@
 use clap::{Parser, Subcommand};
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::io::{self, BufRead, Write};
+use std::path::{Path, PathBuf};
 
 use crate::config;
 use crate::state::{GlobalState, WorkspaceStatus};
 
 #[derive(Parser)]
-#[command(name = "martins", about = "Terminal workspace manager for AI coding agents orchestration")]
+#[command(name = "martins", version, about = "Terminal workspace manager for AI coding agents orchestration")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -51,6 +52,8 @@ pub enum WorkspacesAction {
         /// Workspace name
         name: String,
     },
+    /// Delete all orphan workspace directories not tracked in state
+    Prune,
 }
 
 pub fn run(cmd: Command) -> anyhow::Result<()> {
@@ -80,6 +83,7 @@ fn run_workspaces(action: WorkspacesAction) -> anyhow::Result<()> {
                         WorkspaceStatus::Active => "active",
                         WorkspaceStatus::Inactive => "inactive",
                         WorkspaceStatus::Archived => "archived",
+                        WorkspaceStatus::Deleted => "deleted",
                         WorkspaceStatus::Exited(code) => {
                             &format!("exited({})", code)
                         }
@@ -188,9 +192,88 @@ fn run_workspaces(action: WorkspacesAction) -> anyhow::Result<()> {
                 std::process::exit(1);
             }
         }
+        WorkspacesAction::Prune => {
+            let orphans = collect_orphans(&state, &workspaces_dir);
+
+            if orphans.is_empty() {
+                println!("No orphan workspaces found.");
+                return Ok(());
+            }
+
+            println!("Found {} orphan workspace(s):", orphans.len());
+            for path in &orphans {
+                println!("  {}", path.display());
+            }
+
+            print!("\nDelete all? [y/N] ");
+            io::stdout().flush()?;
+
+            let mut answer = String::new();
+            io::stdin().lock().read_line(&mut answer)?;
+
+            if !matches!(answer.trim(), "y" | "Y" | "yes" | "Yes") {
+                println!("Aborted.");
+                return Ok(());
+            }
+
+            let mut deleted = 0u32;
+            for path in &orphans {
+                if std::fs::remove_dir_all(path).is_ok() {
+                    deleted += 1;
+                    println!("  deleted {}", path.display());
+                } else {
+                    eprintln!("  failed  {}", path.display());
+                }
+            }
+            println!("Pruned {} orphan workspace(s).", deleted);
+        }
     }
 
     Ok(())
+}
+
+fn collect_orphans(state: &GlobalState, workspaces_dir: &Path) -> Vec<PathBuf> {
+    let mut orphans = Vec::new();
+
+    for project in &state.projects {
+        let known_names: HashSet<&str> = project.workspaces.iter().map(|w| w.name.as_str()).collect();
+        let project_ws_dir = workspaces_dir.join(&project.name);
+        if let Ok(entries) = std::fs::read_dir(&project_ws_dir) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if !known_names.contains(name.as_str()) {
+                        orphans.push(entry.path());
+                    }
+                }
+            }
+        }
+    }
+
+    let known_projects: HashSet<&str> = state.projects.iter().map(|p| p.name.as_str()).collect();
+    if let Ok(entries) = std::fs::read_dir(workspaces_dir) {
+        for entry in entries.flatten() {
+            if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
+            }
+            let proj_name = entry.file_name().to_string_lossy().to_string();
+            if known_projects.contains(proj_name.as_str()) {
+                continue;
+            }
+            if let Ok(ws_entries) = std::fs::read_dir(entry.path()) {
+                for ws_entry in ws_entries.flatten() {
+                    if ws_entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                        orphans.push(ws_entry.path());
+                    }
+                }
+            }
+            if entry.path().read_dir().map(|mut d| d.next().is_none()).unwrap_or(true) {
+                orphans.push(entry.path());
+            }
+        }
+    }
+
+    orphans
 }
 
 fn mutate_workspace(
