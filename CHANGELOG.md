@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-04-21
+
+### Added
+
+- `martins workspaces prune` to remove orphan workspace directories after explicit confirmation
+- `martins --version` and `martins -v` to print the current application version
+- Archived workspace entries in the left sidebar, collapsed by default per project
+
+### Changed
+
+- Clicking `✕` on an active workspace now archives it instead of deleting it immediately
+- Archived workspaces can be permanently deleted from the archived section while preserving their state entry as `Deleted`
+
+### Fixed
+
+- Homebrew formula and tap release metadata now match the published macOS asset URL for releases
+
 ## [0.6.0] - 2026-04-20
 
 ### Added
