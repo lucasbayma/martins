@@ -140,7 +140,7 @@ pub async fn switch_project(app: &mut App, idx: usize) {
     app.active_tab = 0;
     app.preview_lines = None;
     app.right_list.select(None);
-    app.refresh_diff().await;
+    app.refresh_diff_spawn();
 }
 
 pub fn queue_workspace_creation(app: &mut App, form: &NewWorkspaceForm) {

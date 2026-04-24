@@ -506,7 +506,7 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
                 crate::workspace::switch_project(app, project_idx).await;
             }
             app.select_active_workspace(workspace_idx);
-            app.refresh_diff().await;
+            app.refresh_diff_spawn();
             let has_tabs = app
                 .active_workspace()
                 .map(|ws| !ws.tabs.is_empty())
@@ -553,7 +553,7 @@ pub async fn activate_sidebar_item(app: &mut App, index: usize) {
                 crate::workspace::switch_project(app, project_idx).await;
             }
             app.select_active_workspace(workspace_idx);
-            app.refresh_diff().await;
+            app.refresh_diff_spawn();
         }
         _ => {}
     }
