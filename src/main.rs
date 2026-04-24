@@ -4,6 +4,7 @@ mod cli;
 mod config;
 mod editor;
 mod error;
+mod events;
 mod git;
 mod keys;
 mod logging;
