@@ -198,16 +198,24 @@ impl App {
                 break;
             }
 
+            // Input-priority event loop (ARCH-03): the `biased` directive
+            // below forces select! to poll futures top-to-bottom. The
+            // `events.next()` branch sits first, so keyboard/mouse input
+            // is processed on the very next iteration after a keystroke
+            // becomes ready — PTY output and timers cannot starve input.
             tokio::select! {
                 biased;
 
+                // 1. INPUT — highest priority. Keyboard, mouse, paste, resize.
                 Some(Ok(event)) = events.next() => {
                     self.mark_dirty();
                     crate::events::handle_event(self, event).await;
                 }
+                // 2. PTY output — high-volume under streaming agents.
                 _ = self.pty_manager.output_notify.notified() => {
                     self.mark_dirty();
                 }
+                // 3. File watcher — debounced filesystem events.
                 Some(event) = async {
                     if let Some(w) = &mut self.watcher {
                         w.next_event().await
@@ -219,9 +227,11 @@ impl App {
                     self.refresh_diff().await;
                     self.mark_dirty();
                 }
+                // 4. Heartbeat — 5s tick to advance sidebar working-dot.
                 _ = heartbeat_tick.tick() => {
                     self.mark_dirty();
                 }
+                // 5. Safety-net diff refresh — Phase 5 replaces with event-driven.
                 _ = refresh_tick.tick() => {
                     self.refresh_diff().await;
                     self.mark_dirty();
