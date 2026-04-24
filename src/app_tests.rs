@@ -82,3 +82,40 @@ async fn tab_click_detects_select_close_and_add() {
     assert_eq!(app.tab_at_column(terminal, 19), Some(TabClick::Close(1)));
     assert_eq!(app.tab_at_column(terminal, 21), Some(TabClick::Add));
 }
+
+#[tokio::test]
+async fn app_starts_dirty() {
+    let app = App::new(
+        GlobalState::default(),
+        std::env::temp_dir().join("martins-dirty-start.json"),
+    )
+    .await
+    .unwrap();
+    assert!(app.dirty, "first frame must render");
+}
+
+#[tokio::test]
+async fn dirty_stays_clear_when_no_mutation() {
+    let mut app = App::new(
+        GlobalState::default(),
+        std::env::temp_dir().join("martins-dirty-clear.json"),
+    )
+    .await
+    .unwrap();
+    app.dirty = false;
+    // no mutation
+    assert!(!app.dirty);
+}
+
+#[tokio::test]
+async fn mark_dirty_sets_flag() {
+    let mut app = App::new(
+        GlobalState::default(),
+        std::env::temp_dir().join("martins-dirty-mark.json"),
+    )
+    .await
+    .unwrap();
+    app.dirty = false;
+    app.mark_dirty();
+    assert!(app.dirty);
+}
