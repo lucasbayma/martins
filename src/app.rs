@@ -69,6 +69,8 @@ pub struct App {
     pub should_quit: bool,
     pub(crate) dirty: bool,
     pub watcher: Option<crate::watcher::Watcher>,
+    pub(crate) diff_tx: tokio::sync::mpsc::UnboundedSender<Vec<crate::git::diff::FileEntry>>,
+    pub(crate) diff_rx: tokio::sync::mpsc::UnboundedReceiver<Vec<crate::git::diff::FileEntry>>,
     pub last_panes: Option<PaneRects>,
     pub sidebar_items: Vec<SidebarItem>,
     pub state_path: PathBuf,
@@ -112,6 +114,9 @@ impl App {
             None
         };
 
+        let (diff_tx, diff_rx) =
+            tokio::sync::mpsc::unbounded_channel::<Vec<crate::git::diff::FileEntry>>();
+
         let mut app = Self {
             global_state,
             active_project_idx,
@@ -131,6 +136,8 @@ impl App {
             should_quit: false,
             dirty: true,
             watcher,
+            diff_tx,
+            diff_rx,
             last_panes: None,
             sidebar_items: Vec::new(),
             state_path,
@@ -236,6 +243,19 @@ impl App {
                     self.refresh_diff().await;
                     self.mark_dirty();
                 }
+                // 6. Diff-refresh results — drain background refresh_diff_spawn outputs.
+                Some(files) = self.diff_rx.recv() => {
+                    self.modified_files = files;
+                    if self.modified_files.is_empty() {
+                        self.right_list.select(None);
+                    } else if self.right_list.selected().is_none() {
+                        self.right_list.select(Some(0));
+                    } else if let Some(selected) = self.right_list.selected() {
+                        self.right_list
+                            .select(Some(selected.min(self.modified_files.len() - 1)));
+                    }
+                    self.mark_dirty();
+                }
             }
         }
 
@@ -265,6 +285,43 @@ impl App {
                 self.right_list.select(Some(selected.min(self.modified_files.len() - 1)));
             }
         }
+    }
+
+    /// Non-blocking variant of [`refresh_diff`] for the navigation hot path.
+    ///
+    /// Spawns the git2 work onto a tokio task and returns immediately. Results
+    /// arrive on `diff_rx` and are applied by the 6th select branch in
+    /// `App::run`. Use from nav call-sites (workspace switch, sidebar
+    /// activate) where blocking the input arm on git2 causes perceptible
+    /// stutter. See
+    /// `.planning/phases/04-navigation-fluidity/04-RESEARCH.md` §3 + §7.
+    ///
+    /// The existing async [`refresh_diff`] stays in use for the `App::new`
+    /// pre-first-frame call and the watcher / refresh_tick branches — those
+    /// are not on the user-facing input hot path.
+    ///
+    /// Do NOT collapse with [`refresh_diff`] — the sync-by-design return
+    /// shape is load-bearing for the nav hot path. Plan 04-01's test
+    /// `refresh_diff_spawn_is_nonblocking` locks in a <50ms return budget.
+    pub(crate) fn refresh_diff_spawn(&mut self) {
+        let args = match (self.active_project(), self.active_workspace()) {
+            (Some(_), Some(ws)) => Some((ws.worktree_path.clone(), ws.base_branch.clone())),
+            (Some(p), None) => Some((p.repo_root.clone(), p.base_branch.clone())),
+            _ => None,
+        };
+        let Some((path, base_branch)) = args else {
+            self.modified_files.clear();
+            self.right_list.select(None);
+            self.mark_dirty();
+            return;
+        };
+        let tx = self.diff_tx.clone();
+        tokio::spawn(async move {
+            if let Ok(files) = diff::modified_files(path, base_branch).await {
+                let _ = tx.send(files);
+            }
+        });
+        self.mark_dirty();
     }
 
     pub(crate) fn open_new_tab_picker(&mut self) {
