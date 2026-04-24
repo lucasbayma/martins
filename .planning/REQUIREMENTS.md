@@ -47,7 +47,8 @@ Requirements for the fluidity milestone. Each maps to exactly one roadmap phase.
 
 <!-- Structural work needed to enable the perf goals above. -->
 
-- [ ] **ARCH-01**: `src/app.rs` is split into focused modules: event routing, modal controller, workspace lifecycle, draw orchestration — each file ≤ ~500 lines and single-responsibility
+- [x] **ARCH-01
+**: `src/app.rs` is split into focused modules: event routing, modal controller, workspace lifecycle, draw orchestration — each file ≤ ~500 lines and single-responsibility
 - [ ] **ARCH-02**: The event loop exposes a clear "dirty" signal that render reads, decoupling state mutation from draw
 - [ ] **ARCH-03**: Input events (keyboard/mouse) have a dedicated, higher-priority branch in the `tokio::select!` loop so PTY output and timers can't starve them
 

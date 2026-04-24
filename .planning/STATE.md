@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: executing
+stopped_at: Completed 01-01 draw extraction (auto-approved Task 3 checkpoint)
+last_updated: "2026-04-24T08:50:46.091Z"
+last_activity: 2026-04-24
+progress:
+  total_phases: 6
+  completed_phases: 0
+  total_plans: 5
+  completed_plans: 1
+  percent: 20
+---
+
 # Project State
 
 ## Project Reference
@@ -5,20 +21,21 @@
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Input-to-pixel responsiveness must feel like a native GPU-accelerated terminal (Ghostty/Alacritty baseline).
-**Current focus:** Phase 1 — Architectural Split
+**Current focus:** Phase 01 — architectural-split
 
 ## Current Position
 
-Phase: 1 of 6 (Architectural Split)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-04-23 — Roadmap created, 19 v1 requirements mapped across 6 phases
+Phase: 01 (architectural-split) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-04-24
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: —
 - Total execution time: —
@@ -30,10 +47,12 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: —
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 01 P01-01 | 15m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -47,6 +66,8 @@ Recent decisions affecting current work:
 - Diff refresh → event-driven + 30s safety net (drop 5s timer)
 - `src/app.rs` refactor is in-scope — rides the momentum of touching the event loop
 - No platform expansion — macOS-only stays
+- Draw orchestration free-function pattern (ui::draw) established for phase-1 extractions
+- App::active_workspace, build_working_map, active_sessions elevated to pub(crate) for module extraction
 
 ### Pending Todos
 
@@ -66,6 +87,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-23
-Stopped at: Roadmap + STATE initialized; awaiting `/gsd-plan-phase 1`
+Last session: 2026-04-24T08:50:41.678Z
+Stopped at: Completed 01-01 draw extraction (auto-approved Task 3 checkpoint)
 Resume file: None

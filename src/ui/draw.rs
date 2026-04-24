@@ -73,7 +73,9 @@ pub fn draw(app: &mut crate::app::App, frame: &mut Frame) {
         frame,
         panes.terminal,
         &active_sessions,
-        app.active_workspace().map(|workspace| workspace.tabs.as_slice()).unwrap_or(&[]),
+        app.active_workspace()
+            .map(|workspace| workspace.tabs.as_slice())
+            .unwrap_or(&[]),
         active_tab,
         app.mode,
         true,
@@ -166,9 +168,15 @@ pub fn menu_bar(frame: &mut Frame, area: Rect) {
     }
 
     let mut spans = vec![ratatui::text::Span::raw(" ")];
-    for (idx, (key, label)) in [("n", "New"), ("t", "Tab"), ("d", "Delete"), ("?", "Help"), ("q", "Quit")]
-        .into_iter()
-        .enumerate()
+    for (idx, (key, label)) in [
+        ("n", "New"),
+        ("t", "Tab"),
+        ("d", "Delete"),
+        ("?", "Help"),
+        ("q", "Quit"),
+    ]
+    .into_iter()
+    .enumerate()
     {
         if idx > 0 {
             spans.push(ratatui::text::Span::raw("  "));

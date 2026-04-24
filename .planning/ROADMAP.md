@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. The app compiles, runs, and behaves identically to pre-refactor from the user's perspective — no regressions in existing flows
 **Plans:** 5 plans
 Plans:
-- [ ] 01-01-PLAN.md — Extract draw orchestration into src/ui/draw.rs
+- [x] 01-01-PLAN.md — Extract draw orchestration into src/ui/draw.rs
 - [ ] 01-02-PLAN.md — Extract modal dispatch into src/ui/modal_controller.rs
 - [ ] 01-03-PLAN.md — Extract event routing into src/events.rs
 - [ ] 01-04-PLAN.md — Extract workspace lifecycle into src/workspace.rs
@@ -105,7 +105,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Architectural Split | 0/TBD | Not started | - |
+| 1. Architectural Split | 1/5 | In progress | - |
 | 2. Event Loop Rewire | 0/TBD | Not started | - |
 | 3. PTY Input Fluidity | 0/TBD | Not started | - |
 | 4. Navigation Fluidity | 0/TBD | Not started | - |
