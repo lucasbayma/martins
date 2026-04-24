@@ -5,8 +5,8 @@ use crate::keys::{Action, InputMode, Keymap};
 use crate::pty::manager::PtyManager;
 use crate::state::{Agent, GlobalState, Project, TabSpec, Workspace};
 use crate::ui::layout::{self, LayoutState, PaneRects};
-use crate::ui::modal::{self, AddProjectForm, CommandArgsForm, Modal, NewWorkspaceForm};
-use crate::ui::picker::{self, Picker, PickerKind, PickerOutcome};
+use crate::ui::modal::{AddProjectForm, CommandArgsForm, Modal, NewWorkspaceForm};
+use crate::ui::picker::{Picker, PickerKind, PickerOutcome};
 use crate::ui::preview;
 use anyhow::Result;
 use crossterm::event::{
@@ -17,7 +17,7 @@ use futures::StreamExt;
 use ratatui::{
     DefaultTerminal, Frame,
     layout::Rect,
-    widgets::{ListState, Paragraph},
+    widgets::ListState,
 };
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -337,178 +337,7 @@ impl App {
     }
 
     fn draw(&mut self, frame: &mut Frame) {
-        let area = frame.area();
-        self.last_frame_area = area;
-
-        if layout::is_too_small(area) {
-            let message = Paragraph::new("Terminal too small (min 80×24)")
-                .style(ratatui::style::Style::default().fg(crate::ui::theme::ACCENT_TERRA));
-            frame.render_widget(message, area);
-            return;
-        }
-
-        let panes = layout::compute(area, &self.layout);
-        self.last_panes = Some(panes.clone());
-
-        if let Some(left_rect) = panes.left {
-            let working_map = self.build_working_map();
-            self.sidebar_items = crate::ui::sidebar_left::render(
-                frame,
-                left_rect,
-                &self.global_state,
-                self.active_project_idx,
-                self.active_workspace_idx,
-                &mut self.left_list,
-                matches!(self.mode, InputMode::Normal),
-                &working_map,
-                &self.archived_expanded,
-            );
-        } else {
-            self.sidebar_items.clear();
-            self.left_list.select(None);
-        }
-
-        if let Some(right_rect) = panes.right {
-            let base_branch = self
-                .active_project()
-                .map(|project| project.base_branch.clone())
-                .unwrap_or_else(|| "main".to_string());
-            crate::ui::sidebar_right::render(
-                frame,
-                right_rect,
-                &self.modified_files,
-                &mut self.right_list,
-                false,
-                &base_branch,
-            );
-        }
-
-        let active_sessions = self.active_sessions();
-        let active_tab = if active_sessions.is_empty() {
-            0
-        } else {
-            self.active_tab.min(active_sessions.len() - 1)
-        };
-
-        let ws_info = self.active_workspace().map(|ws| {
-            crate::ui::terminal::WorkspaceInfo {
-                name: ws.name.clone(),
-                path: ws.worktree_path.to_string_lossy().to_string(),
-            }
-        });
-
-        crate::ui::terminal::render(
-            frame,
-            panes.terminal,
-            &active_sessions,
-            self.active_workspace().map(|workspace| workspace.tabs.as_slice()).unwrap_or(&[]),
-            active_tab,
-            self.mode,
-            true,
-            ws_info.as_ref(),
-            self.selection.as_ref(),
-        );
-
-        self.draw_status_bar(frame, panes.status_bar);
-        self.draw_menu_bar(frame, panes.menu_bar);
-        modal::render(frame, &self.modal);
-
-        if let Some(picker) = &self.picker {
-            picker::render(frame, picker);
-        }
-
-        if let Some((path, lines)) = &self.preview_lines {
-            preview::render_preview(frame, path, lines);
-        }
-    }
-
-    fn draw_status_bar(&self, frame: &mut Frame, area: Rect) {
-        let mode_label = match self.mode {
-            InputMode::Normal => " NORMAL ",
-            InputMode::Terminal => " TERMINAL ",
-        };
-        let mode_color = match self.mode {
-            InputMode::Normal => crate::ui::theme::ACCENT_GOLD,
-            InputMode::Terminal => crate::ui::theme::ACCENT_SAGE,
-        };
-        let project_name = self
-            .active_project()
-            .map(|project| project.name.as_str())
-            .unwrap_or("no project");
-        let workspace_name = self
-            .active_workspace()
-            .map(|workspace| workspace.name.as_str())
-            .unwrap_or("-");
-
-        let quit_label = " [Quit] ";
-        let left_spans = vec![
-            ratatui::text::Span::styled(
-                mode_label,
-                ratatui::style::Style::default()
-                    .fg(mode_color)
-                    .add_modifier(ratatui::style::Modifier::BOLD),
-            ),
-            ratatui::text::Span::styled(
-                format!("  {} > {}  ", project_name, workspace_name),
-                ratatui::style::Style::default().fg(crate::ui::theme::TEXT_MUTED),
-            ),
-            ratatui::text::Span::styled(
-                format!("{} changes", self.modified_files.len()),
-                ratatui::style::Style::default().fg(crate::ui::theme::TEXT_DIM),
-            ),
-        ];
-
-        let left_width: u16 = left_spans
-            .iter()
-            .map(|s| s.content.len() as u16)
-            .sum();
-        let gap = (area.width).saturating_sub(left_width + quit_label.len() as u16);
-
-        let mut spans = left_spans;
-        spans.push(ratatui::text::Span::styled(
-            " ".repeat(gap as usize),
-            ratatui::style::Style::default(),
-        ));
-        spans.push(ratatui::text::Span::styled(
-            quit_label,
-            ratatui::style::Style::default()
-                .fg(crate::ui::theme::ACCENT_TERRA)
-                .add_modifier(ratatui::style::Modifier::BOLD),
-        ));
-
-        let status = Paragraph::new(ratatui::text::Line::from(spans));
-        frame.render_widget(status, area);
-    }
-
-    fn draw_menu_bar(&self, frame: &mut Frame, area: Rect) {
-        fn item(key: &str, label: &str) -> Vec<ratatui::text::Span<'static>> {
-            vec![
-                ratatui::text::Span::styled(
-                    key.to_string(),
-                    ratatui::style::Style::default()
-                        .fg(crate::ui::theme::ACCENT_GOLD)
-                        .add_modifier(ratatui::style::Modifier::BOLD),
-                ),
-                ratatui::text::Span::styled(
-                    format!(" {label}"),
-                    ratatui::style::Style::default().fg(crate::ui::theme::TEXT_MUTED),
-                ),
-            ]
-        }
-
-        let mut spans = vec![ratatui::text::Span::raw(" ")];
-        for (idx, (key, label)) in [("n", "New"), ("t", "Tab"), ("d", "Delete"), ("?", "Help"), ("q", "Quit")]
-            .into_iter()
-            .enumerate()
-        {
-            if idx > 0 {
-                spans.push(ratatui::text::Span::raw("  "));
-            }
-            spans.extend(item(key, label));
-        }
-
-        let menu = Paragraph::new(ratatui::text::Line::from(spans));
-        frame.render_widget(menu, area);
+        crate::ui::draw::draw(self, frame);
     }
 
     async fn handle_event(&mut self, event: Event) {
