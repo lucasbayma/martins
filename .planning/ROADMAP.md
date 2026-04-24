@@ -98,7 +98,7 @@ Plans:
   5. Sitting in the app for several minutes, the user experiences no random lag spikes — interaction feels consistent, not "sometimes fine, sometimes stuck"
 **Plans:** 4 plans
 Plans:
-- [ ] 05-01-PLAN.md — Wave 0: TDD tests (save_state_spawn_is_nonblocking fails-to-compile + debounce_rapid_burst_of_10)
+- [x] 05-01-PLAN.md — Wave 0: TDD tests (save_state_spawn_is_nonblocking fails-to-compile + debounce_rapid_burst_of_10)
 - [ ] 05-02-PLAN.md — Wave 1: add save_state_spawn primitive + 30s refresh_tick + non-blocking watcher/refresh arms + 200ms debounce
 - [ ] 05-03-PLAN.md — Wave 2: migrate 13 hot-path save_state() call sites + wrap archive remove_dir_all in spawn_blocking
 - [ ] 05-04-PLAN.md — Wave 3: manual UAT of 5 ROADMAP criteria + PHASE-SUMMARY.md
