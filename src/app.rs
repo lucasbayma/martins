@@ -361,6 +361,33 @@ impl App {
         }
     }
 
+    /// Non-blocking variant of [`save_state`].
+    ///
+    /// Clones `global_state` + `state_path` and dispatches the fs::write +
+    /// atomic rename to a tokio blocking worker. Errors are logged via
+    /// `tracing::error!` (same contract as the synchronous [`save_state`]).
+    ///
+    /// Use from every call site EXCEPT the graceful-exit drain in
+    /// [`App::run`], where we need the write to complete before process
+    /// exit (see Pitfall #5 below).
+    ///
+    /// Do NOT add `self.mark_dirty()` here — state save does not affect
+    /// render (unlike `refresh_diff_spawn` which drives the right-pane
+    /// file list). Do NOT `.await` the `spawn_blocking` JoinHandle —
+    /// the fire-and-forget shape is load-bearing for BG-05.
+    ///
+    /// See `.planning/phases/05-background-work-decoupling/05-RESEARCH.md`
+    /// §9 Pattern 2 + §8 Pitfall #5.
+    pub(crate) fn save_state_spawn(&self) {
+        let state = self.global_state.clone();
+        let path = self.state_path.clone();
+        tokio::task::spawn_blocking(move || {
+            if let Err(error) = state.save(&path) {
+                tracing::error!("failed to save state: {error}");
+            }
+        });
+    }
+
     pub(crate) fn write_active_tab_input(&mut self, bytes: &[u8]) {
         let Some(project) = self.active_project() else { return };
         let Some(workspace) = self.active_workspace() else { return };
