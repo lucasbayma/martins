@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 05-02 Wave-1 — App::save_state_spawn primitive + run-loop rewire (30s + non-blocking arms) + 200ms debounce; BG-01/02/03/04/05 all satisfied; Plan 05-03 cleared to wire 13 call sites"
-last_updated: "2026-04-24T22:02:02.668Z"
+stopped_at: Completed 05-03 Wave-2 — 13 hot-path save_state() sites migrated to save_state_spawn() across events.rs/workspace.rs/modal_controller.rs; archive_active_workspace + delete_archived_workspace remove_dir_all wrapped in spawn_blocking; BG-05 fully satisfied; Plan 05-04 (UAT) cleared
+last_updated: "2026-04-24T22:10:38.584Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 16
-  completed_plans: 17
+  completed_plans: 18
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-23)
 ## Current Position
 
 Phase: 05 (background-work-decoupling) — EXECUTING
-Plan: 3 of 4 (next)
+Plan: 4 of 4 (next)
 Status: Ready to execute
 Last activity: 2026-04-24
 
@@ -64,6 +64,7 @@ Progress: [██████████] 100%
 | Phase 03 P01 | ~15m | 3 tasks | 3 files |
 | Phase 05 P01 | ~10m | 3 tasks | 2 files |
 | Phase 05 P02 | 25 | 3 tasks | 2 files |
+| Phase 05 P03 | 5m | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,7 @@ Recent decisions affecting current work:
 - Phase 05-01: Wave-0 regression-guard tests landed — `save_state_spawn_is_nonblocking` (BG-05 TDD gate, fails to compile until Plan 05-02) + `debounce_rapid_burst_of_10` (BG-04 200ms-window guard, passes today on 750ms); Task 3 verification adapted to read app_tests registration from src/app.rs (Phase 1 layout) instead of src/main.rs as plan claimed
 - Phase 05-02: BG-05 primitive App::save_state_spawn lands at src/app.rs:381 (tokio::task::spawn_blocking + Clone-and-move on global_state + state_path); App::run rewired (refresh_tick 5s→30s, watcher arm + refresh_tick arm fire-and-forget); watcher debounce 750ms→200ms; #[allow(dead_code)] on save_state_spawn until Plan 05-03 wires call sites
 - Phase 05-02: 4 deviations all auto-fixed (1 Rule 3 dead_code allow, 3 Rule 1 watcher test fixes — tightened test bursts to back-to-back writes, pre-create noise dirs + drain FSEvents historical buffer in filter_noise); zero assertion loosening, zero #[ignore], zero production code changes beyond the 4 planned edits
+- Phase 05-03: 13 hot-path save_state() sites migrated to save_state_spawn() (events.rs=4, workspace.rs=7, modal_controller.rs=2); archive_active_workspace + delete_archived_workspace remove_dir_all calls wrapped in tokio::task::spawn_blocking (Rule 2 — both bare calls had identical blocking concern; net: 0 bare remove_dir_all in workspace.rs); #[allow(dead_code)] removed from save_state_spawn; graceful-exit drain at src/app.rs:264 preserved (Pitfall #5)
 
 ### Pending Todos
 
@@ -111,8 +113,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-24T22:02:02.661Z
-Stopped at: Completed 05-02 Wave-1 — App::save_state_spawn primitive + run-loop rewire (30s + non-blocking arms) + 200ms debounce; BG-01/02/03/04/05 all satisfied; Plan 05-03 cleared to wire 13 call sites
+Last session: 2026-04-24T22:10:30.098Z
+Stopped at: Completed 05-03 Wave-2 — 13 hot-path save_state() sites migrated to save_state_spawn() across events.rs/workspace.rs/modal_controller.rs; archive_active_workspace + delete_archived_workspace remove_dir_all wrapped in spawn_blocking; BG-05 fully satisfied; Plan 05-04 (UAT) cleared
 Resume file: None
 Next: Phase 5 Plan 02 (Wave 1) — implement App::save_state_spawn (makes BG-05 gate compile + pass) and tighten watcher debounce 750ms → 200ms
 
