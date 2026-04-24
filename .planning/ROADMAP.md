@@ -80,7 +80,11 @@ Plans:
   2. Clicking any sidebar item (project, workspace, tab) activates it with no perceptible pause before the pane updates
   3. Switching workspaces shows the target PTY view immediately — no blank frame, no "loading" flash, no re-render stutter
   4. Switching tabs within a workspace is instantaneous — the previous tab's view is replaced in a single frame
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 04-01-PLAN.md — Wave 0: four failing nav regression-guard tests + make_large_repo fixture (TDD gate for 04-02)
+- [ ] 04-02-PLAN.md — Wave 1: add diff_tx/diff_rx + refresh_diff_spawn + 6th select branch; replace 3 .await call-sites
+- [ ] 04-03-PLAN.md — Wave 2: manual UAT (four feel-tests) + PHASE-SUMMARY.md on approved
 
 ### Phase 5: Background Work Decoupling
 **Goal**: Eliminate the random lag spikes caused by background work. Git diff refresh becomes event-driven (debounced `notify` events, 30s safety net), file watcher bursts coalesce, and state saves never block input or render.
