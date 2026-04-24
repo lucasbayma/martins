@@ -566,29 +566,34 @@ pub fn write_input(&mut self, data: &[u8]) -> Result<()> { /* ... */ }
 
 **Verify with user during discuss-phase or planner review** whether A2 (assumption about frame-budget gate not being needed) should be validated empirically before committing to Option A, or whether Option B should be executed pre-emptively.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Is Plan 03-01 sufficient, or should 03-02 (frame-budget gate) run too?**
    - What we know: Phase 2's primitives cover PTY-01/02/03 structurally. Whether they cover them empirically depends on draw cost + PTY-reader throttle interaction.
    - What's unclear: how `tui-term` + large scrollback performs under sustained PTY burst.
    - Recommendation: run Plan 03-01, do UAT, decide on 03-02.
+   - **RESOLVED:** Run 03-01 first; 03-02 only if 03-01 UAT flags PTY-01 or PTY-02 failing.
 
 2. **Should `refresh_tick`'s 9% CPU spike (Phase 5 scope) also be looked at in Phase 3 because it can steal cycles from keystroke processing?**
    - What we know: refresh_tick fires every 5s, runs `refresh_diff().await` which spawns a git subprocess.
    - What's unclear: whether the 9% spike is brief enough (<16ms) to not delay a keystroke.
    - Recommendation: **out of scope for Phase 3**; ROADMAP maps BG-01/02/03 to Phase 5. Note as a cross-phase concern in PHASE-SUMMARY.
+   - **RESOLVED:** Out of scope — deferred to Phase 5.
 
 3. **Should paste (`Event::Paste`) get special treatment?**
    - What we know: `src/events.rs:24-32` wraps paste in bracketed-paste markers and does one synchronous write.
    - What's unclear: whether large pastes (>4 KiB) block the event loop visibly.
    - Recommendation: **out of scope for PTY-01/02/03** unless UAT flags it. Fix if needed: chunk the paste write across multiple select iterations.
+   - **RESOLVED:** Out of scope unless manual UAT flags paste-specific lag.
 
 4. **Should we add a tracing span around `terminal.draw` + the keystroke path for future diagnosis?**
    - OBS-01 is v2 out of scope. But a `#[cfg(debug_assertions)]` span would cost nothing in release. Recommendation: **out of scope unless the planner wants to add it opportunistically.**
+   - **RESOLVED:** Out of scope unless planner wants opportunistically; not required for Phase 3.
 
 5. **Is there any reason to worry about IME (Input Method Editor) or special terminal modes (bracketed paste, mouse reporting) for PTY-01?**
    - What we know: crossterm handles IME-composed characters as `KeyEvent::Char` after IME commit; raw mode is enabled by `ratatui::DefaultTerminal`.
    - Recommendation: **no special handling needed for PTY-01/02/03 baseline.** IME users on macOS get the same path as any other KeyEvent.
+   - **RESOLVED:** No special handling needed — crossterm delivers key events regardless.
 
 ## Environment Availability
 
