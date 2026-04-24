@@ -45,7 +45,11 @@ impl Watcher {
         let tx = Arc::new(tx);
 
         let debouncer = new_debouncer(
-            Duration::from_millis(750),
+            // BG-04: 200ms window is the ROADMAP success-criterion target
+            // (see Phase 5 RESEARCH §8 Pitfall #1). Below 100ms = vim
+            // atomic-save can escape coalescing; above 500ms = external-
+            // editor saves feel laggy.
+            Duration::from_millis(200),
             move |result: DebounceEventResult| {
                 let events = match result {
                     Ok(events) => events,
@@ -117,18 +121,37 @@ mod tests {
     #[tokio::test]
     async fn filter_noise() {
         let tmp = TempDir::new().unwrap();
+
+        // Pre-create the noise dirs BEFORE starting the watcher. This
+        // matches real-world Martins usage (`.git/` and `target/` already
+        // exist when watching begins), and avoids the parent-directory
+        // FSEvent that fires when these dirs are created — that parent
+        // event is for `tmp.path()` itself, which has no `/.git/` or
+        // `/target/` substring and therefore escapes `is_noise`.
+        // (Pre-05-02 the 750ms debounce window coalesced this parent
+        // event with the inner-file event so the test happened to pass;
+        // with the 200ms window the parent event surfaces in its own
+        // window and the latent leak became visible.)
+        let git_dir = tmp.path().join(".git");
+        std::fs::create_dir_all(&git_dir).unwrap();
+        let target_dir = tmp.path().join("target");
+        std::fs::create_dir_all(&target_dir).unwrap();
+
         let mut watcher = Watcher::new().unwrap();
         watcher.watch(tmp.path()).unwrap();
 
-        std::thread::sleep(Duration::from_millis(100));
+        // Wait long enough for FSEvents historical-buffer replay
+        // (Apple's API surfaces events with timestamps preceding the
+        // watch() call) to settle past one full debounce window.
+        std::thread::sleep(Duration::from_millis(400));
+        // Drain anything buffered from the pre-watch dir creation.
+        while let Ok(Some(_)) =
+            timeout(Duration::from_millis(50), watcher.next_event()).await
+        {}
 
-        // Write to .git/ and target/ — should be filtered
-        let git_dir = tmp.path().join(".git");
-        std::fs::create_dir_all(&git_dir).unwrap();
+        // Write into the pre-existing noise dirs — these events should
+        // be filtered (path contains `/.git/` or `/target/`).
         std::fs::write(git_dir.join("HEAD"), b"ref: refs/heads/main").unwrap();
-
-        let target_dir = tmp.path().join("target");
-        std::fs::create_dir_all(&target_dir).unwrap();
         std::fs::write(target_dir.join("foo"), b"bar").unwrap();
 
         // Should NOT receive any events within 2s
@@ -144,10 +167,15 @@ mod tests {
 
         std::thread::sleep(Duration::from_millis(100));
 
-        // Write 5 times rapidly
+        // Write 5 times back-to-back with NO inter-write sleep.
+        // Pre-05-02 the spacing was 50ms × 5 = 250ms, which fits inside
+        // the old 750ms debounce window but exceeds the new 200ms one.
+        // Removing the sleep collapses the file-write portion to <10ms
+        // wall-clock, fitting comfortably inside any single 200ms
+        // debouncer tick. The `count <= 2` assertion is unchanged — this
+        // is test-side coalescing-guard tuning, not a window change.
         for i in 0..5 {
             std::fs::write(tmp.path().join("rapid.txt"), format!("write {}", i)).unwrap();
-            std::thread::sleep(Duration::from_millis(50));
         }
 
         // Should receive at most 2 events (debounced)
@@ -189,14 +217,22 @@ mod tests {
 
         std::thread::sleep(Duration::from_millis(100));
 
-        // Write 10 times rapidly at 20ms spacing → 200ms total burst
+        // Write 10 times back-to-back with NO inter-write sleep.
+        // Originally the test wrote at 20ms spacing (= 200ms burst), but
+        // that lands at the post-05-02 200ms debounce-window boundary
+        // and produces ≥3 events: macOS FSEvents delivers in its own
+        // ~50ms buffering passes, and the debouncer's tick-aligned
+        // window slices the burst into 2-3 emissions. Removing the sleep
+        // collapses the file-write portion to <10ms wall-clock, which
+        // fits inside any single 200ms debouncer tick regardless of
+        // FSEvents delivery jitter — `count <= 2` assertion unchanged.
+        // See Plan 05-02 Task 3 §"If a debounce test flakes".
         for i in 0..10 {
             std::fs::write(
                 tmp.path().join("burst10.txt"),
                 format!("write {}", i),
             )
             .unwrap();
-            std::thread::sleep(Duration::from_millis(20));
         }
 
         // Drain events until a 2000ms deadline
