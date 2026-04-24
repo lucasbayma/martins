@@ -55,7 +55,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 02-01-PLAN.md — Dirty-flag rendering (ARCH-02): add `App.dirty` + `mark_dirty()`, gate `terminal.draw()`, rewire run loop
-- [ ] 02-02-PLAN.md — Input-priority tokio::select! (ARCH-03): annotate and verify `biased;` + input-first branch ordering
+- [x] 02-02-PLAN.md — Input-priority tokio::select! (ARCH-03): annotate and verify `biased;` + input-first branch ordering
 
 ### Phase 3: PTY Input Fluidity
 **Goal**: Typing in the PTY main pane feels like typing into Ghostty — each keystroke renders immediately, and heavy background output (streaming agent logs) does not delay input.
