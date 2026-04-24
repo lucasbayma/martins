@@ -90,7 +90,7 @@ pub async fn handle_modal_key(app: &mut App, key: KeyEvent) {
                 }
                 app.modal = Modal::None;
                 app.refresh_active_workspace_after_change();
-                app.save_state();
+                app.save_state_spawn();
             }
             _ => app.modal = Modal::ConfirmArchive(form),
         },
@@ -233,7 +233,7 @@ pub async fn handle_modal_click(app: &mut App, col: u16, row: u16) -> bool {
                         project.archive(&form.workspace_name);
                     }
                     app.refresh_active_workspace_after_change();
-                    app.save_state();
+                    app.save_state_spawn();
                 }
                 app.modal = Modal::None;
             }

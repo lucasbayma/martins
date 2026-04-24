@@ -381,11 +381,8 @@ impl App {
     /// See `.planning/phases/05-background-work-decoupling/05-RESEARCH.md`
     /// §9 Pattern 2 + §8 Pitfall #5.
     ///
-    /// `#[allow(dead_code)]` is intentional: production call sites are
-    /// wired in Plan 05-03 (`events.rs` / `workspace.rs` /
-    /// `modal_controller.rs`). Until then, only the BG-05 test exercises
-    /// this method.
-    #[allow(dead_code)]
+    /// Production call sites (Plan 05-03): 4 in `events.rs`, 7 in
+    /// `workspace.rs`, 2 in `modal_controller.rs` — 13 total.
     pub(crate) fn save_state_spawn(&self) {
         let state = self.global_state.clone();
         let path = self.state_path.clone();
