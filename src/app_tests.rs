@@ -6,6 +6,7 @@ use super::*;
 use crate::state::{Agent, Project, TabSpec};
 use git2::Repository;
 use std::path::Path;
+use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
 fn init_repo(dir: &Path) -> Project {
@@ -118,4 +119,43 @@ async fn mark_dirty_sets_flag() {
     app.dirty = false;
     app.mark_dirty();
     assert!(app.dirty);
+}
+
+/// BG-05 LOAD-BEARING — `App::save_state_spawn()` returns in <5ms even on a
+/// pathological-size `GlobalState` (100 projects). The serialize + fs::write +
+/// atomic rename runs on `tokio::task::spawn_blocking`; results do not feed
+/// back into App state.
+///
+/// Plan 05-01 writes this test as a FAILING regression guard — `cargo build
+/// --tests` FAILS today with `no method named save_state_spawn found for
+/// struct App`. That compile error IS the TDD gate for Plan 05-02. Do NOT
+/// stub `save_state_spawn` to silence the error.
+///
+/// After Plan 05-02 lands, this test must pass. Budget: 5ms (tighter than
+/// Phase 4's 50ms because spawn_blocking dispatch is pure channel-send +
+/// clone, with no git2 floor).
+///
+/// See: .planning/phases/05-background-work-decoupling/05-PATTERNS.md
+/// §"src/app_tests.rs" + 05-RESEARCH.md §12 line 440.
+#[tokio::test]
+async fn save_state_spawn_is_nonblocking() {
+    let tmp = TempDir::new().expect("TempDir");
+    let mut state = GlobalState::default();
+    for i in 0..100 {
+        state.add_project(&tmp.path().join(format!("repo-{i}")), "main".to_string());
+    }
+
+    let state_path = std::env::temp_dir().join("martins-bg-save-spawn.json");
+    let _ = std::fs::remove_file(&state_path);
+    let app = App::new(state, state_path).await.expect("App::new");
+
+    let before = Instant::now();
+    app.save_state_spawn();
+    let elapsed = before.elapsed();
+
+    assert!(
+        elapsed < Duration::from_millis(5),
+        "save_state_spawn returned in {elapsed:?} — must be <5ms (did it block on fs::write?). \
+         If this fails, someone reintroduced the sync save call path in Plan 05-02's refactor."
+    );
 }
