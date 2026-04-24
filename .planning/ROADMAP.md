@@ -96,7 +96,12 @@ Plans:
   3. A burst of file changes (e.g., `cargo build`, `git checkout`) produces at most one diff refresh, not a flurry
   4. Creating, archiving, or deleting a workspace feels instant — the state-save to `~/.martins/state.json` never produces a visible pause
   5. Sitting in the app for several minutes, the user experiences no random lag spikes — interaction feels consistent, not "sometimes fine, sometimes stuck"
-**Plans**: TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 05-01-PLAN.md — Wave 0: TDD tests (save_state_spawn_is_nonblocking fails-to-compile + debounce_rapid_burst_of_10)
+- [ ] 05-02-PLAN.md — Wave 1: add save_state_spawn primitive + 30s refresh_tick + non-blocking watcher/refresh arms + 200ms debounce
+- [ ] 05-03-PLAN.md — Wave 2: migrate 13 hot-path save_state() call sites + wrap archive remove_dir_all in spawn_blocking
+- [ ] 05-04-PLAN.md — Wave 3: manual UAT of 5 ROADMAP criteria + PHASE-SUMMARY.md
 
 ### Phase 6: Text Selection
 **Goal**: Drag-select text in the PTY main pane with a visible highlight, copy with `cmd+c`, clear with click/Escape — matching Ghostty's feel. The highlight survives streaming PTY output until the user explicitly clears it.
@@ -120,5 +125,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Event Loop Rewire | 1/2 | In progress | - |
 | 3. PTY Input Fluidity | 1/1 | Complete | 2026-04-24 |
 | 4. Navigation Fluidity | 0/TBD | Not started | - |
-| 5. Background Work Decoupling | 0/TBD | Not started | - |
+| 5. Background Work Decoupling | 0/4 | Not started | - |
 | 6. Text Selection | 0/TBD | Not started | - |
