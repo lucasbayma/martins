@@ -155,7 +155,7 @@ pub fn confirm_delete_workspace(app: &mut App, form: &DeleteForm) {
         project.remove(&name);
     }
     app.refresh_active_workspace_after_change();
-    app.save_state();
+    app.save_state_spawn();
 }
 
 pub fn archive_active_workspace(app: &mut App) {
@@ -176,9 +176,18 @@ pub fn archive_active_workspace(app: &mut App) {
         project.archive(&ws_name);
     }
     app.refresh_active_workspace_after_change();
-    app.save_state();
+    app.save_state_spawn();
 
-    let _ = std::fs::remove_dir_all(&worktree_path);
+    // BG-05 success criterion #4 (archive feels instant): worktree
+    // cleanup can take hundreds of ms on node_modules/target-heavy
+    // repos. Spawn on a blocking worker — fire-and-forget. By this
+    // point the workspace is already unlinked from global_state, so
+    // a failed cleanup leaves only a filesystem remnant (not a
+    // correctness issue). See RESEARCH §17 Q3.
+    let worktree = worktree_path.clone();
+    tokio::task::spawn_blocking(move || {
+        let _ = std::fs::remove_dir_all(&worktree);
+    });
 }
 
 pub fn delete_archived_workspace(app: &mut App, project_idx: usize, archived_idx: usize) {
@@ -191,8 +200,14 @@ pub fn delete_archived_workspace(app: &mut App, project_idx: usize, archived_idx
         project.delete_workspace(&ws_name);
     }
 
-    let _ = std::fs::remove_dir_all(&worktree_path);
-    app.save_state();
+    // BG-05 success criterion #4: same rationale as archive_active_workspace.
+    // Worktree cleanup moves off the event-loop thread; fire-and-forget
+    // because the workspace is already unlinked from global_state.
+    let worktree = worktree_path.clone();
+    tokio::task::spawn_blocking(move || {
+        let _ = std::fs::remove_dir_all(&worktree);
+    });
+    app.save_state_spawn();
 }
 
 pub async fn confirm_remove_project(app: &mut App, form: &RemoveProjectForm) {
@@ -212,7 +227,7 @@ pub async fn confirm_remove_project(app: &mut App, form: &RemoveProjectForm) {
         app.preview_lines = None;
         app.watcher = None;
     }
-    app.save_state();
+    app.save_state_spawn();
 }
 
 pub async fn create_workspace(app: &mut App, name: Option<String>) -> Result<(), String> {
@@ -260,7 +275,7 @@ pub async fn create_workspace(app: &mut App, name: Option<String>) -> Result<(),
         .unwrap_or(0);
     app.active_workspace_idx = active_count.checked_sub(1);
     app.active_tab = 0;
-    app.save_state();
+    app.save_state_spawn();
 
     let _ = create_tab(app, "shell".to_string()).await;
     Ok(())
@@ -316,7 +331,7 @@ pub async fn create_tab(app: &mut App, command: String) -> Result<(), String> {
         .map_err(|error| error.to_string())?;
 
     app.mode = InputMode::Terminal;
-    app.save_state();
+    app.save_state_spawn();
     Ok(())
 }
 
@@ -339,7 +354,7 @@ pub async fn add_project_from_path(app: &mut App, path: String) -> Result<(), St
         .iter()
         .position(|project| project.id == project_id);
     app.active_workspace_idx = app.active_project().and_then(|project| project.active().next().map(|_| 0));
-    app.save_state();
+    app.save_state_spawn();
     if let Some(idx) = app.active_project_idx {
         switch_project(app, idx).await;
     }
