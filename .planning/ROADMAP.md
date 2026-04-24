@@ -69,7 +69,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 03-01-PLAN.md — TDD: three failing PTY-input tests + write_input sync-guarantee doc-comment + manual UAT (PTY-01/02/03)
-- [ ] 03-02-PLAN.md — CONDITIONAL (triggered by 03-01 UAT fail): frame-budget gate in App::run + should_draw helper + sleep_until branch (PTY-01/02) — SKIPPED, remains on disk as considered-alternative
+- [x] 03-02-PLAN.md — CONDITIONAL (triggered by 03-01 UAT fail): frame-budget gate in App::run + should_draw helper + sleep_until branch (PTY-01/02) — SKIPPED, remains on disk as considered-alternative
 
 ### Phase 4: Navigation Fluidity
 **Goal**: Every way of moving around the app — keyboard sidebar nav, mouse clicks on sidebar items, workspace switching, tab switching — feels instant with no stutter or blank frames.
