@@ -116,9 +116,11 @@ async fn refresh_diff_spawn_is_nonblocking() {
     let project = make_large_repo(tmp.path(), 500);
     let project_id = project.id.clone();
 
-    let mut state = GlobalState::default();
-    state.active_project_id = Some(project_id);
-    state.projects.push(project);
+    let state = GlobalState {
+        active_project_id: Some(project_id),
+        projects: vec![project],
+        ..Default::default()
+    };
 
     let state_path = std::env::temp_dir().join("martins-nav-refresh-spawn.json");
     let _ = std::fs::remove_file(&state_path);
@@ -145,9 +147,11 @@ async fn workspace_switch_paints_pty_first() {
     let project = make_large_repo(tmp.path(), 200);
     let project_id = project.id.clone();
 
-    let mut state = GlobalState::default();
-    state.active_project_id = Some(project_id);
-    state.projects.push(project);
+    let state = GlobalState {
+        active_project_id: Some(project_id),
+        projects: vec![project],
+        ..Default::default()
+    };
 
     let state_path = std::env::temp_dir().join("martins-nav-switch-paints.json");
     let _ = std::fs::remove_file(&state_path);
