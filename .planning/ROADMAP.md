@@ -66,7 +66,10 @@ Plans:
   2. While an agent is streaming verbose output, the user can still type into the input line and see characters appear immediately
   3. Idle the app for 30 seconds, then press a key — the first keystroke renders with no warmup lag (no starvation from idle redraws)
   4. `top` / Activity Monitor shows CPU at near-zero when the app is idle with no PTY output
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 03-01-PLAN.md — TDD: three failing PTY-input tests + write_input sync-guarantee doc-comment + manual UAT (PTY-01/02/03)
+- [ ] 03-02-PLAN.md — CONDITIONAL (triggered by 03-01 UAT fail): frame-budget gate in App::run + should_draw helper + sleep_until branch (PTY-01/02)
 
 ### Phase 4: Navigation Fluidity
 **Goal**: Every way of moving around the app — keyboard sidebar nav, mouse clicks on sidebar items, workspace switching, tab switching — feels instant with no stutter or blank frames.
