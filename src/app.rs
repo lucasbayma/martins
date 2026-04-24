@@ -1,9 +1,9 @@
 //! Application state and main event loop.
 
-use crate::git::{diff, repo};
+use crate::git::diff;
 use crate::keys::{Action, InputMode, Keymap};
 use crate::pty::manager::PtyManager;
-use crate::state::{Agent, GlobalState, Project, TabSpec, Workspace};
+use crate::state::{GlobalState, Project, Workspace};
 use crate::ui::layout::{self, LayoutState, PaneRects};
 use crate::ui::modal::{Modal, NewWorkspaceForm};
 use crate::ui::picker::{Picker, PickerKind, PickerOutcome};
@@ -15,7 +15,7 @@ use ratatui::{
     layout::Rect,
     widgets::ListState,
 };
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::interval;
 
@@ -187,7 +187,7 @@ impl App {
                     let tmux_name =
                         crate::tmux::tab_session_name(&project.id, &workspace.name, tab.id);
                     if !existing_sessions.contains(&tmux_name) {
-                        let program = tab_program_for_resume(&tab.command);
+                        let program = crate::workspace::tab_program_for_resume(&tab.command);
                         let _ = crate::tmux::new_session(
                             &tmux_name,
                             &workspace.worktree_path,
@@ -220,7 +220,7 @@ impl App {
                             matches!(cmd, "bash" | "zsh" | "sh" | "fish" | "dash")
                         });
                         if is_shell {
-                            let program = tab_program_for_resume(&tab.command);
+                            let program = crate::workspace::tab_program_for_resume(&tab.command);
                             crate::tmux::send_key(&tmux_name, &program);
                             crate::tmux::send_key(&tmux_name, "Enter");
                         }
@@ -420,103 +420,27 @@ impl App {
     }
 
     pub(crate) async fn switch_project(&mut self, idx: usize) {
-        if idx >= self.global_state.projects.len() {
-            return;
-        }
-
-        let old_repo_root = self.active_project().map(|project| project.repo_root.clone());
-        let new_repo_root = self.global_state.projects[idx].repo_root.clone();
-        let new_project_id = self.global_state.projects[idx].id.clone();
-
-        if let Some(watcher) = &mut self.watcher {
-            if let Some(old_repo_root) = old_repo_root {
-                let _ = watcher.unwatch(&old_repo_root);
-            }
-            let _ = watcher.watch(&new_repo_root);
-        } else if let Ok(mut watcher) = crate::watcher::Watcher::new() {
-            let _ = watcher.watch(&new_repo_root);
-            self.watcher = Some(watcher);
-        }
-
-        self.active_project_idx = Some(idx);
-        self.global_state.active_project_id = Some(new_project_id);
-        self.active_workspace_idx = self.global_state.projects[idx].active().next().map(|_| 0);
-        self.active_tab = 0;
-        self.preview_lines = None;
-        self.right_list.select(None);
-        self.refresh_diff().await;
+        crate::workspace::switch_project(self, idx).await;
     }
 
     pub(crate) fn queue_workspace_creation(&mut self, form: &NewWorkspaceForm) {
-        let name = (!form.name_input.is_empty()).then(|| form.name_input.clone());
-        self.modal = Modal::Loading("Creating workspace...".to_string());
-        self.pending_workspace = Some(name);
+        crate::workspace::queue_workspace_creation(self, form);
     }
 
     pub(crate) fn confirm_delete_workspace(&mut self, form: &crate::ui::modal::DeleteForm) {
-        let name = form.workspace_name.clone();
-        if let Some(project) = self.active_project_mut() {
-            project.remove(&name);
-        }
-        self.refresh_active_workspace_after_change();
-        self.save_state();
+        crate::workspace::confirm_delete_workspace(self, form);
     }
 
     pub(crate) fn archive_active_workspace(&mut self) {
-        let Some(ws) = self.active_workspace() else { return };
-        let ws_name = ws.name.clone();
-        let worktree_path = ws.worktree_path.clone();
-        let tab_ids: Vec<u32> = ws.tabs.iter().map(|t| t.id).collect();
-        let Some(project) = self.active_project() else { return };
-        let project_id = project.id.clone();
-
-        for tab_id in &tab_ids {
-            let tmux_name = crate::tmux::tab_session_name(&project_id, &ws_name, *tab_id);
-            crate::tmux::kill_session(&tmux_name);
-            self.pty_manager.close_tab(&project_id, &ws_name, *tab_id);
-        }
-
-        if let Some(project) = self.active_project_mut() {
-            project.archive(&ws_name);
-        }
-        self.refresh_active_workspace_after_change();
-        self.save_state();
-
-        let _ = std::fs::remove_dir_all(&worktree_path);
+        crate::workspace::archive_active_workspace(self);
     }
 
     pub(crate) fn delete_archived_workspace(&mut self, project_idx: usize, archived_idx: usize) {
-        let Some(project) = self.global_state.projects.get(project_idx) else { return };
-        let Some(ws) = project.archived().nth(archived_idx) else { return };
-        let ws_name = ws.name.clone();
-        let worktree_path = ws.worktree_path.clone();
-
-        if let Some(project) = self.global_state.projects.get_mut(project_idx) {
-            project.delete_workspace(&ws_name);
-        }
-
-        let _ = std::fs::remove_dir_all(&worktree_path);
-        self.save_state();
+        crate::workspace::delete_archived_workspace(self, project_idx, archived_idx);
     }
 
     pub(crate) async fn confirm_remove_project(&mut self, form: &crate::ui::modal::RemoveProjectForm) {
-        self.global_state.remove_project(&form.project_id);
-        self.active_project_idx = self
-            .global_state
-            .active_project_id
-            .as_ref()
-            .and_then(|id| self.global_state.projects.iter().position(|project| &project.id == id));
-        if let Some(idx) = self.active_project_idx {
-            self.switch_project(idx).await;
-        } else {
-            self.active_workspace_idx = None;
-            self.active_tab = 0;
-            self.modified_files.clear();
-            self.right_list.select(None);
-            self.preview_lines = None;
-            self.watcher = None;
-        }
-        self.save_state();
+        crate::workspace::confirm_remove_project(self, form).await;
     }
 
     pub(crate) fn write_active_tab_input(&mut self, bytes: &[u8]) {
@@ -654,134 +578,15 @@ impl App {
     }
 
     async fn create_workspace(&mut self, name: Option<String>) -> Result<(), String> {
-        let project = self
-            .active_project_mut()
-            .ok_or_else(|| "no active project".to_string())?;
-
-        if let Some(ref n) = name {
-            if project.workspaces.iter().any(|w| w.name == *n) {
-                return Err(format!("workspace '{}' already exists", n));
-            }
-        }
-
-        let repo_root = project.repo_root.clone();
-        let base_branch = project.base_branch.clone();
-
-        let ws_name = crate::agents::create_workspace_entry(project, name, Agent::default())
-            .map_err(|error| error.to_string())?;
-
-        let wt_path = crate::git::worktree::create(
-            repo_root,
-            ws_name.clone(),
-            base_branch,
-        )
-        .await;
-
-        if let Err(e) = &wt_path {
-            if let Some(project) = self.active_project_mut() {
-                project.remove(&ws_name);
-            }
-            return Err(e.to_string());
-        }
-        let wt_path = wt_path.unwrap();
-
-        let ws = self
-            .active_project_mut()
-            .and_then(|p| p.workspaces.iter_mut().find(|w| w.name == ws_name))
-            .ok_or_else(|| "workspace disappeared".to_string())?;
-        ws.worktree_path = wt_path;
-        ws.status = crate::state::WorkspaceStatus::Active;
-
-        let active_count = self
-            .active_project()
-            .map(|p| p.active().count())
-            .unwrap_or(0);
-        self.active_workspace_idx = active_count.checked_sub(1);
-        self.active_tab = 0;
-        self.save_state();
-
-        let _ = self.create_tab("shell".to_string()).await;
-        Ok(())
+        crate::workspace::create_workspace(self, name).await
     }
 
     pub(crate) async fn create_tab(&mut self, command: String) -> Result<(), String> {
-        let Some(project) = self.active_project() else {
-            return Err("no active project".to_string());
-        };
-        let Some(workspace) = self.active_workspace() else {
-            return Err("no active workspace".to_string());
-        };
-
-        let project_id = project.id.clone();
-        let ws_name = workspace.name.clone();
-        let worktree_path = workspace.worktree_path.clone();
-        let next_id = workspace.tabs.iter().map(|tab| tab.id).max().map_or(0, |id| id + 1);
-        let (rows, cols) = self.last_pty_size;
-        let tmux_name = crate::tmux::tab_session_name(&project_id, &ws_name, next_id);
-        let program = tab_program_for_new(&command);
-
-        let tmux_name_c = tmux_name.clone();
-        let worktree_c = worktree_path.clone();
-        let program_c = program.clone();
-        tokio::task::spawn_blocking(move || {
-            crate::tmux::new_session(&tmux_name_c, &worktree_c, &program_c, cols, rows)
-        })
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
-
-        if let Some(project) = self.active_project_mut()
-            && let Some(workspace) = project.workspaces.iter_mut().find(|workspace| workspace.name == ws_name)
-        {
-            workspace.tabs.push(TabSpec {
-                id: next_id,
-                command: command.clone(),
-            });
-            self.active_tab = workspace.tabs.len() - 1;
-        }
-
-        self.pty_manager
-            .spawn_tab(
-                project_id,
-                ws_name,
-                next_id,
-                worktree_path,
-                "tmux",
-                &["attach-session", "-t", &tmux_name],
-                rows,
-                cols,
-            )
-            .map_err(|error| error.to_string())?;
-
-        self.mode = InputMode::Terminal;
-        self.save_state();
-        Ok(())
+        crate::workspace::create_tab(self, command).await
     }
 
     pub(crate) async fn add_project_from_path(&mut self, path: String) -> Result<(), String> {
-        let trimmed = path.trim();
-        if trimmed.is_empty() {
-            return Err("path is required".to_string());
-        }
-
-        let repo_root = repo::discover(Path::new(trimmed)).map_err(|error| error.to_string())?;
-        let base_branch = repo::current_branch_async(repo_root.clone())
-            .await
-            .unwrap_or_else(|_| "main".to_string());
-        let project_id = self.global_state.ensure_project(&repo_root, base_branch);
-        let _ = crate::config::ensure_gitignore(&repo_root);
-        self.global_state.active_project_id = Some(project_id.clone());
-        self.active_project_idx = self
-            .global_state
-            .projects
-            .iter()
-            .position(|project| project.id == project_id);
-        self.active_workspace_idx = self.active_project().and_then(|project| project.active().next().map(|_| 0));
-        self.save_state();
-        if let Some(idx) = self.active_project_idx {
-            self.switch_project(idx).await;
-        }
-        Ok(())
+        crate::workspace::add_project_from_path(self, path).await
     }
 
     pub(crate) fn tab_at_column(&self, terminal: Rect, col: u16) -> Option<TabClick> {
@@ -810,43 +615,12 @@ impl App {
     }
 }
 
-fn tab_program_for_new(command: &str) -> String {
-    if let Some(path) = command.strip_prefix("diff ") {
-        let escaped = path.replace('\'', "'\\''");
-        return format!(
-            "(git diff --color=always -- '{escaped}' 2>/dev/null; \
-             if [ -f '{escaped}' ] && ! git ls-files --error-unmatch '{escaped}' >/dev/null 2>&1; then \
-             git diff --no-index --color=always /dev/null '{escaped}' 2>/dev/null; fi) | less -R"
-        );
-    }
-    match command {
-        "shell" => {
-            if Path::new("/bin/zsh").exists() {
-                "/bin/zsh".to_string()
-            } else {
-                "/bin/sh".to_string()
-            }
-        }
-        _ => command.to_string(),
-    }
-}
-
-fn tab_program_for_resume(command: &str) -> String {
-    if command.starts_with("diff ") {
-        return tab_program_for_new(command);
-    }
-    match command {
-        "shell" => tab_program_for_new(command),
-        "opencode" => "opencode -c".to_string(),
-        _ => command.to_string(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::Project;
+    use crate::state::{Agent, Project, TabSpec};
     use git2::Repository;
+    use std::path::Path;
     use tempfile::TempDir;
 
     fn init_repo(dir: &Path) -> Project {
