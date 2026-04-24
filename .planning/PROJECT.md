@@ -23,13 +23,13 @@ Martins is a Rust TUI workspace orchestrator for macOS that manages git worktree
 - ✓ Workspace lifecycle (create, archive, delete, prune) via CLI + TUI — existing
 - ✓ Atomic state persistence to `~/.martins/state.json` + backup — existing
 - ✓ Homebrew distribution + universal macOS binary — existing
+- ✓ **REQ-PERF-02**: Sidebar navigation responds instantly — validated in Phase 4 (Navigation Fluidity): NAV-01..04 user UAT sign-off 2026-04-24, `refresh_diff` made fire-and-forget on nav hot path via `refresh_diff_spawn` + mpsc drain branch
 
 ### Active
 
 <!-- Current milestone: make Martins feel native-terminal-fluid. -->
 
 - [ ] **REQ-PERF-01**: Typing in the PTY pane feels immediate — no perceptible lag between keystroke and on-screen character (baseline: Ghostty/Alacritty feel)
-- [ ] **REQ-PERF-02**: Sidebar navigation (keyboard + mouse click) responds instantly with no frame-drop
 - [ ] **REQ-PERF-03**: Workspace/tab switching is instantaneous — no visible pause or re-render stutter
 - [ ] **REQ-PERF-04**: Text selection in the PTY main pane works via mouse drag, with `cmd+c` copy (Ghostty-style), with no lag
 - [ ] **REQ-PERF-05**: Periodic lag spikes caused by background work (git diff refresh, file watcher, state saves) are eliminated
@@ -99,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-23 after initialization*
+*Last updated: 2026-04-24 after Phase 4 (Navigation Fluidity) completion*
