@@ -430,7 +430,7 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
                 }
             }
 
-            app.save_state();
+            app.save_state_spawn();
         }
         Action::SwitchTab(n) => {
             let Some(workspace) = app.active_workspace() else {
@@ -493,13 +493,13 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
                 if let Some(project) = app.global_state.projects.get_mut(idx) {
                     project.expanded = !project.expanded;
                 }
-                app.save_state();
+                app.save_state_spawn();
             } else {
                 crate::workspace::switch_project(app, idx).await;
                 if let Some(project) = app.global_state.projects.get_mut(idx) {
                     project.expanded = true;
                 }
-                app.save_state();
+                app.save_state_spawn();
             }
         }
         Action::ClickWorkspace(project_idx, workspace_idx) => {
@@ -535,7 +535,7 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
             if let Some(project) = app.global_state.projects.get_mut(idx) {
                 project.expanded = !project.expanded;
             }
-            app.save_state();
+            app.save_state_spawn();
         }
         _ => {}
     }
