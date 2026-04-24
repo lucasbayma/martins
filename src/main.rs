@@ -15,6 +15,7 @@ mod tmux;
 mod tools;
 mod ui;
 mod watcher;
+mod workspace;
 
 use anyhow::Result;
 use clap::Parser;
