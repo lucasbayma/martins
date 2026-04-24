@@ -250,7 +250,7 @@ impl App {
             .and_then(|idx| self.global_state.projects.get(idx))
     }
 
-    fn active_project_mut(&mut self) -> Option<&mut Project> {
+    pub(crate) fn active_project_mut(&mut self) -> Option<&mut Project> {
         self.active_project_idx
             .and_then(|idx| self.global_state.projects.get_mut(idx))
     }
@@ -1221,7 +1221,7 @@ impl App {
         self.right_list.select(None);
     }
 
-    fn refresh_active_workspace_after_change(&mut self) {
+    pub(crate) fn refresh_active_workspace_after_change(&mut self) {
         let active_count = self.active_project().map(|project| project.active().count()).unwrap_or(0);
         self.active_workspace_idx = if active_count == 0 {
             None
@@ -1230,7 +1230,7 @@ impl App {
         };
     }
 
-    fn save_state(&self) {
+    pub(crate) fn save_state(&self) {
         if let Err(error) = self.global_state.save(&self.state_path) {
             tracing::error!("failed to save state: {error}");
         }
@@ -1264,13 +1264,13 @@ impl App {
         self.refresh_diff().await;
     }
 
-    fn queue_workspace_creation(&mut self, form: &NewWorkspaceForm) {
+    pub(crate) fn queue_workspace_creation(&mut self, form: &NewWorkspaceForm) {
         let name = (!form.name_input.is_empty()).then(|| form.name_input.clone());
         self.modal = Modal::Loading("Creating workspace...".to_string());
         self.pending_workspace = Some(name);
     }
 
-    fn confirm_delete_workspace(&mut self, form: &crate::ui::modal::DeleteForm) {
+    pub(crate) fn confirm_delete_workspace(&mut self, form: &crate::ui::modal::DeleteForm) {
         let name = form.workspace_name.clone();
         if let Some(project) = self.active_project_mut() {
             project.remove(&name);
@@ -1316,7 +1316,7 @@ impl App {
         self.save_state();
     }
 
-    async fn confirm_remove_project(&mut self, form: &crate::ui::modal::RemoveProjectForm) {
+    pub(crate) async fn confirm_remove_project(&mut self, form: &crate::ui::modal::RemoveProjectForm) {
         self.global_state.remove_project(&form.project_id);
         self.active_project_idx = self
             .global_state
@@ -1521,7 +1521,7 @@ impl App {
         Ok(())
     }
 
-    async fn create_tab(&mut self, command: String) -> Result<(), String> {
+    pub(crate) async fn create_tab(&mut self, command: String) -> Result<(), String> {
         let Some(project) = self.active_project() else {
             return Err("no active project".to_string());
         };
@@ -1575,7 +1575,7 @@ impl App {
         Ok(())
     }
 
-    async fn add_project_from_path(&mut self, path: String) -> Result<(), String> {
+    pub(crate) async fn add_project_from_path(&mut self, path: String) -> Result<(), String> {
         let trimmed = path.trim();
         if trimmed.is_empty() {
             return Err("path is required".to_string());
