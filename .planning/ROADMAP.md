@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 5 plans
 Plans:
 - [x] 01-01-PLAN.md — Extract draw orchestration into src/ui/draw.rs
-- [ ] 01-02-PLAN.md — Extract modal dispatch into src/ui/modal_controller.rs
+- [x] 01-02-PLAN.md — Extract modal dispatch into src/ui/modal_controller.rs
 - [ ] 01-03-PLAN.md — Extract event routing into src/events.rs
 - [ ] 01-04-PLAN.md — Extract workspace lifecycle into src/workspace.rs
 - [ ] 01-05-PLAN.md — Final slim-down of src/app.rs to ≤500 lines
