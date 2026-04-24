@@ -16,7 +16,7 @@ pub async fn handle_modal_key(app: &mut App, key: KeyEvent) {
         Modal::NewWorkspace(mut form) => match key.code {
             KeyCode::Esc => app.modal = Modal::None,
             KeyCode::Enter => {
-                app.queue_workspace_creation(&form);
+                crate::workspace::queue_workspace_creation(app, &form);
             }
             KeyCode::Backspace => {
                 form.name_input.pop();
@@ -36,7 +36,7 @@ pub async fn handle_modal_key(app: &mut App, key: KeyEvent) {
                 if let Some(entry) = form.selected_entry().cloned() {
                     if entry.is_git_repo {
                         let path = entry.path.to_string_lossy().to_string();
-                        match app.add_project_from_path(path).await {
+                        match crate::workspace::add_project_from_path(app, path).await {
                             Ok(()) => app.modal = Modal::None,
                             Err(error) => {
                                 form.error = Some(error);
@@ -69,7 +69,7 @@ pub async fn handle_modal_key(app: &mut App, key: KeyEvent) {
         Modal::ConfirmDelete(form) => match key.code {
             KeyCode::Esc => app.modal = Modal::None,
             KeyCode::Enter => {
-                app.confirm_delete_workspace(&form);
+                crate::workspace::confirm_delete_workspace(app, &form);
                 app.modal = Modal::None;
             }
             _ => app.modal = Modal::ConfirmDelete(form),
@@ -97,7 +97,7 @@ pub async fn handle_modal_key(app: &mut App, key: KeyEvent) {
         Modal::ConfirmRemoveProject(form) => match key.code {
             KeyCode::Esc => app.modal = Modal::None,
             KeyCode::Enter => {
-                app.confirm_remove_project(&form).await;
+                crate::workspace::confirm_remove_project(app, &form).await;
                 app.modal = Modal::None;
             }
             _ => app.modal = Modal::ConfirmRemoveProject(form),
@@ -110,7 +110,7 @@ pub async fn handle_modal_key(app: &mut App, key: KeyEvent) {
                 } else {
                     format!("{} {}", form.agent, form.args_input.trim())
                 };
-                if let Err(error) = app.create_tab(command).await {
+                if let Err(error) = crate::workspace::create_tab(app, command).await {
                     tracing::error!("failed to create tab: {error}");
                 }
             }
@@ -185,7 +185,7 @@ pub async fn handle_modal_click(app: &mut App, col: u16, row: u16) -> bool {
             if let Some(entry) = entry {
                 if entry.is_git_repo {
                     let path = entry.path.to_string_lossy().to_string();
-                    match app.add_project_from_path(path).await {
+                    match crate::workspace::add_project_from_path(app, path).await {
                         Ok(()) => app.modal = Modal::None,
                         Err(error) => {
                             form.error = Some(error);
@@ -248,7 +248,7 @@ pub async fn handle_modal_click(app: &mut App, col: u16, row: u16) -> bool {
 
             if row == modal_button_row_y(modal_area) {
                 if is_modal_first_button(modal_area, col, 12) {
-                    app.confirm_delete_workspace(&form);
+                    crate::workspace::confirm_delete_workspace(app, &form);
                 }
                 app.modal = Modal::None;
             }
@@ -263,7 +263,7 @@ pub async fn handle_modal_click(app: &mut App, col: u16, row: u16) -> bool {
 
             if row == modal_button_row_y(modal_area) {
                 if is_modal_first_button(modal_area, col, 16) {
-                    app.confirm_remove_project(&form).await;
+                    crate::workspace::confirm_remove_project(app, &form).await;
                 }
                 app.modal = Modal::None;
             }
@@ -284,7 +284,7 @@ pub async fn handle_modal_click(app: &mut App, col: u16, row: u16) -> bool {
 
             if row == modal_button_row_y(modal_area) {
                 if is_modal_first_button(modal_area, col, 12) {
-                    app.queue_workspace_creation(&form);
+                    crate::workspace::queue_workspace_creation(app, &form);
                 } else {
                     app.modal = Modal::None;
                 }
@@ -307,7 +307,7 @@ pub async fn handle_modal_click(app: &mut App, col: u16, row: u16) -> bool {
                     } else {
                         format!("{} {}", form.agent, form.args_input.trim())
                     };
-                    if let Err(error) = app.create_tab(command).await {
+                    if let Err(error) = crate::workspace::create_tab(app, command).await {
                         tracing::error!("failed to create tab: {error}");
                     }
                 } else {

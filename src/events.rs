@@ -191,10 +191,10 @@ pub async fn handle_click(app: &mut App, col: u16, row: u16) {
                     let delete_zone_start = left.x + left.width.saturating_sub(4);
                     if col >= delete_zone_start {
                         if app.active_project_idx != Some(project_idx) {
-                            app.switch_project(project_idx).await;
+                            crate::workspace::switch_project(app, project_idx).await;
                         }
                         app.select_active_workspace(workspace_idx);
-                        app.archive_active_workspace();
+                        crate::workspace::archive_active_workspace(app);
                     } else {
                         dispatch_action(app, Action::ClickWorkspace(project_idx, workspace_idx)).await;
                     }
@@ -210,7 +210,7 @@ pub async fn handle_click(app: &mut App, col: u16, row: u16) {
                 SidebarItem::ArchivedWorkspace(project_idx, archived_idx) => {
                     let delete_zone_start = left.x + left.width.saturating_sub(4);
                     if col >= delete_zone_start {
-                        app.delete_archived_workspace(project_idx, archived_idx);
+                        crate::workspace::delete_archived_workspace(app, project_idx, archived_idx);
                     }
                 }
                 SidebarItem::AddProject => dispatch_action(app, Action::AddProject).await,
@@ -342,7 +342,7 @@ pub async fn apply_picker_outcome(app: &mut App, outcome: PickerOutcome) {
                 Some(PickerKind::NewTab) => {
                     if let Some(command) = picked_item {
                         if command == "shell" {
-                            if let Err(error) = app.create_tab("shell".to_string()).await {
+                            if let Err(error) = crate::workspace::create_tab(app, "shell".to_string()).await {
                                 tracing::error!("failed to create tab: {error}");
                             }
                         } else {
@@ -460,7 +460,7 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
                 app.modal = Modal::AddProject(AddProjectForm::default());
                 return;
             }
-            app.archive_active_workspace();
+            crate::workspace::archive_active_workspace(app);
         }
         Action::Preview => {
             if let (Some(project), Some(index)) = (app.active_project(), app.right_list.selected())
@@ -494,7 +494,7 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
                 }
                 app.save_state();
             } else {
-                app.switch_project(idx).await;
+                crate::workspace::switch_project(app, idx).await;
                 if let Some(project) = app.global_state.projects.get_mut(idx) {
                     project.expanded = true;
                 }
@@ -503,7 +503,7 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
         }
         Action::ClickWorkspace(project_idx, workspace_idx) => {
             if app.active_project_idx != Some(project_idx) {
-                app.switch_project(project_idx).await;
+                crate::workspace::switch_project(app, project_idx).await;
             }
             app.select_active_workspace(workspace_idx);
             app.refresh_diff().await;
@@ -525,7 +525,7 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
             app.right_list.select(Some(idx));
             if let Some(entry) = app.modified_files.get(idx).cloned() {
                 let path = entry.path.to_string_lossy().to_string();
-                if let Err(error) = app.create_tab(format!("diff {}", path)).await {
+                if let Err(error) = crate::workspace::create_tab(app, format!("diff {}", path)).await {
                     tracing::warn!("failed to open diff tab: {error}");
                 }
             }
@@ -545,12 +545,12 @@ pub async fn activate_sidebar_item(app: &mut App, index: usize) {
     match item {
         SidebarItem::RemoveProject(project_idx) => {
             if app.active_project_idx != Some(project_idx) {
-                app.switch_project(project_idx).await;
+                crate::workspace::switch_project(app, project_idx).await;
             }
         }
         SidebarItem::Workspace(project_idx, workspace_idx) => {
             if app.active_project_idx != Some(project_idx) {
-                app.switch_project(project_idx).await;
+                crate::workspace::switch_project(app, project_idx).await;
             }
             app.select_active_workspace(workspace_idx);
             app.refresh_diff().await;

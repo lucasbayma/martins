@@ -1,20 +1,16 @@
 //! Application state and main event loop.
 
 use crate::git::diff;
-use crate::keys::{Action, InputMode, Keymap};
+use crate::keys::{InputMode, Keymap};
 use crate::pty::manager::PtyManager;
 use crate::state::{GlobalState, Project, Workspace};
 use crate::ui::layout::{self, LayoutState, PaneRects};
 use crate::ui::modal::{Modal, NewWorkspaceForm};
-use crate::ui::picker::{Picker, PickerKind, PickerOutcome};
+use crate::ui::picker::{Picker, PickerKind};
 use anyhow::Result;
-use crossterm::event::{Event, EventStream, KeyEvent, MouseEvent};
+use crossterm::event::{EventStream, KeyEvent};
 use futures::StreamExt;
-use ratatui::{
-    DefaultTerminal, Frame,
-    layout::Rect,
-    widgets::ListState,
-};
+use ratatui::{DefaultTerminal, layout::Rect, widgets::ListState};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::interval;
@@ -262,11 +258,11 @@ impl App {
         let mut status_tick = interval(Duration::from_secs(1));
 
         loop {
-            terminal.draw(|frame| self.draw(frame))?;
+            terminal.draw(|frame| crate::ui::draw::draw(self, frame))?;
             self.sync_pty_size();
 
             if let Some(name) = self.pending_workspace.take() {
-                match self.create_workspace(name).await {
+                match crate::workspace::create_workspace(self, name).await {
                     Ok(()) => self.modal = Modal::None,
                     Err(error) => {
                         self.modal = Modal::NewWorkspace(NewWorkspaceForm {
@@ -284,7 +280,7 @@ impl App {
 
             tokio::select! {
                 Some(Ok(event)) = events.next() => {
-                    self.handle_event(event).await;
+                    crate::events::handle_event(self, event).await;
                 }
                 _ = self.pty_manager.output_notify.notified() => {}
                 _ = status_tick.tick() => {}
@@ -332,56 +328,6 @@ impl App {
         }
     }
 
-    fn draw(&mut self, frame: &mut Frame) {
-        crate::ui::draw::draw(self, frame);
-    }
-
-    async fn handle_event(&mut self, event: Event) {
-        crate::events::handle_event(self, event).await;
-    }
-
-    // Delegators retained for API shape symmetry with handle_event.
-    // Internal callers inside event routing use crate::events::* directly.
-    #[allow(dead_code)]
-    async fn handle_mouse(&mut self, mouse: MouseEvent) {
-        crate::events::handle_mouse(self, mouse).await;
-    }
-
-    #[allow(dead_code)]
-    fn handle_scroll(&mut self, col: u16, row: u16, delta: isize) {
-        crate::events::handle_scroll(self, col, row, delta);
-    }
-
-    #[allow(dead_code)]
-    async fn handle_click(&mut self, col: u16, row: u16) {
-        crate::events::handle_click(self, col, row).await;
-    }
-
-    #[allow(dead_code)]
-    async fn handle_key(&mut self, key: KeyEvent) {
-        crate::events::handle_key(self, key).await;
-    }
-
-    #[allow(dead_code)]
-    async fn handle_picker_click(&mut self, col: u16, row: u16) -> bool {
-        crate::events::handle_picker_click(self, col, row).await
-    }
-
-    #[allow(dead_code)]
-    async fn apply_picker_outcome(&mut self, outcome: PickerOutcome) {
-        crate::events::apply_picker_outcome(self, outcome).await;
-    }
-
-    #[allow(dead_code)]
-    async fn dispatch_action(&mut self, action: Action) {
-        crate::events::dispatch_action(self, action).await;
-    }
-
-    #[allow(dead_code)]
-    async fn activate_sidebar_item(&mut self, index: usize) {
-        crate::events::activate_sidebar_item(self, index).await;
-    }
-
     pub(crate) fn open_new_tab_picker(&mut self) {
         self.picker = Some(Picker::new(
             vec![
@@ -417,30 +363,6 @@ impl App {
         if let Err(error) = self.global_state.save(&self.state_path) {
             tracing::error!("failed to save state: {error}");
         }
-    }
-
-    pub(crate) async fn switch_project(&mut self, idx: usize) {
-        crate::workspace::switch_project(self, idx).await;
-    }
-
-    pub(crate) fn queue_workspace_creation(&mut self, form: &NewWorkspaceForm) {
-        crate::workspace::queue_workspace_creation(self, form);
-    }
-
-    pub(crate) fn confirm_delete_workspace(&mut self, form: &crate::ui::modal::DeleteForm) {
-        crate::workspace::confirm_delete_workspace(self, form);
-    }
-
-    pub(crate) fn archive_active_workspace(&mut self) {
-        crate::workspace::archive_active_workspace(self);
-    }
-
-    pub(crate) fn delete_archived_workspace(&mut self, project_idx: usize, archived_idx: usize) {
-        crate::workspace::delete_archived_workspace(self, project_idx, archived_idx);
-    }
-
-    pub(crate) async fn confirm_remove_project(&mut self, form: &crate::ui::modal::RemoveProjectForm) {
-        crate::workspace::confirm_remove_project(self, form).await;
     }
 
     pub(crate) fn write_active_tab_input(&mut self, bytes: &[u8]) {
@@ -577,18 +499,6 @@ impl App {
             .collect()
     }
 
-    async fn create_workspace(&mut self, name: Option<String>) -> Result<(), String> {
-        crate::workspace::create_workspace(self, name).await
-    }
-
-    pub(crate) async fn create_tab(&mut self, command: String) -> Result<(), String> {
-        crate::workspace::create_tab(self, command).await
-    }
-
-    pub(crate) async fn add_project_from_path(&mut self, path: String) -> Result<(), String> {
-        crate::workspace::add_project_from_path(self, path).await
-    }
-
     pub(crate) fn tab_at_column(&self, terminal: Rect, col: u16) -> Option<TabClick> {
         let workspace = self.active_workspace()?;
         let mut current_col = terminal.x;
@@ -661,7 +571,7 @@ mod tests {
         let mut app = App::new(state, std::env::temp_dir().join("martins-switch.json"))
             .await
             .unwrap();
-        app.switch_project(1).await;
+        crate::workspace::switch_project(&mut app, 1).await;
         assert_eq!(app.active_project_idx, Some(1));
         assert_eq!(app.active_project().map(|p| p.id.as_str()), Some(project2.id.as_str()));
     }
