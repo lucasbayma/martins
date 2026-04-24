@@ -40,7 +40,7 @@ Plans:
 - [x] 01-01-PLAN.md — Extract draw orchestration into src/ui/draw.rs
 - [x] 01-02-PLAN.md — Extract modal dispatch into src/ui/modal_controller.rs
 - [x] 01-03-PLAN.md — Extract event routing into src/events.rs
-- [ ] 01-04-PLAN.md — Extract workspace lifecycle into src/workspace.rs
+- [x] 01-04-PLAN.md — Extract workspace lifecycle into src/workspace.rs
 - [ ] 01-05-PLAN.md — Final slim-down of src/app.rs to ≤500 lines
 
 ### Phase 2: Event Loop Rewire
@@ -105,7 +105,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Architectural Split | 3/5 | In progress | - |
+| 1. Architectural Split | 4/5 | In progress | - |
 | 2. Event Loop Rewire | 0/TBD | Not started | - |
 | 3. PTY Input Fluidity | 0/TBD | Not started | - |
 | 4. Navigation Fluidity | 0/TBD | Not started | - |
