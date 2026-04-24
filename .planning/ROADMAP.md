@@ -54,7 +54,7 @@ Plans:
   4. A reader can point to the single place in the event loop where input takes priority over PTY output and timers
 **Plans:** 2 plans
 Plans:
-- [ ] 02-01-PLAN.md — Dirty-flag rendering (ARCH-02): add `App.dirty` + `mark_dirty()`, gate `terminal.draw()`, rewire run loop
+- [x] 02-01-PLAN.md — Dirty-flag rendering (ARCH-02): add `App.dirty` + `mark_dirty()`, gate `terminal.draw()`, rewire run loop
 - [ ] 02-02-PLAN.md — Input-priority tokio::select! (ARCH-03): annotate and verify `biased;` + input-first branch ordering
 
 ### Phase 3: PTY Input Fluidity
@@ -110,7 +110,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Architectural Split | 5/5 | Complete | 2026-04-24 |
-| 2. Event Loop Rewire | 0/2 | Not started | - |
+| 2. Event Loop Rewire | 1/2 | In progress | - |
 | 3. PTY Input Fluidity | 0/TBD | Not started | - |
 | 4. Navigation Fluidity | 0/TBD | Not started | - |
 | 5. Background Work Decoupling | 0/TBD | Not started | - |
