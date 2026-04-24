@@ -10,8 +10,110 @@ use crate::app::App;
 use crate::git::{repo, worktree};
 use crate::keys::InputMode;
 use crate::state::{Agent, TabSpec, WorkspaceStatus};
+use crate::ui::layout;
 use crate::ui::modal::{DeleteForm, Modal, NewWorkspaceForm, RemoveProjectForm};
+use ratatui::layout::Rect;
 use std::path::Path;
+
+/// Reattach tmux sessions for all active workspaces on startup.
+///
+/// Called from App::new after the App struct is constructed. Spawns any
+/// tmux sessions that have gone missing since last run, resizes existing
+/// ones to match the current terminal geometry, then attaches the
+/// PtyManager to each via `tmux attach-session`.
+pub(crate) fn reattach_tmux_sessions(app: &mut App) {
+    if !crate::tmux::is_available() {
+        return;
+    }
+
+    let (term_cols, term_rows) = crossterm::terminal::size().unwrap_or((80, 24));
+    let frame_rect = Rect::new(0, 0, term_cols, term_rows);
+    let panes = layout::compute(frame_rect, &app.layout);
+    let rows = panes.terminal.height.saturating_sub(3);
+    let cols = panes.terminal.width.saturating_sub(2);
+    app.last_pty_size = (rows, cols);
+
+    let existing_sessions = std::process::Command::new("tmux")
+        .args(["list-sessions", "-F", "#{session_name}"])
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty())
+                .map(ToOwned::to_owned)
+                .collect::<std::collections::HashSet<_>>()
+        })
+        .unwrap_or_default();
+
+    let mut created_sessions = Vec::new();
+
+    for project in &app.global_state.projects {
+        for workspace in project
+            .workspaces
+            .iter()
+            .filter(|w| !matches!(w.status, crate::state::WorkspaceStatus::Archived))
+        {
+            for tab in &workspace.tabs {
+                let tmux_name =
+                    crate::tmux::tab_session_name(&project.id, &workspace.name, tab.id);
+                if !existing_sessions.contains(&tmux_name) {
+                    let program = tab_program_for_resume(&tab.command);
+                    let _ = crate::tmux::new_session(
+                        &tmux_name,
+                        &workspace.worktree_path,
+                        &program,
+                        cols,
+                        rows,
+                    );
+                    created_sessions.push(tmux_name);
+                }
+            }
+        }
+    }
+
+    if !created_sessions.is_empty() {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+
+    for project in &app.global_state.projects {
+        for workspace in project.active() {
+            for tab in &workspace.tabs {
+                let tmux_name =
+                    crate::tmux::tab_session_name(&project.id, &workspace.name, tab.id);
+
+                crate::tmux::enforce_session_options(&tmux_name);
+                crate::tmux::resize_session(&tmux_name, cols, rows);
+
+                if tab.command != "shell" {
+                    let current = crate::tmux::pane_command(&tmux_name);
+                    let is_shell = current.as_deref().is_none_or(|cmd| {
+                        matches!(cmd, "bash" | "zsh" | "sh" | "fish" | "dash")
+                    });
+                    if is_shell {
+                        let program = tab_program_for_resume(&tab.command);
+                        crate::tmux::send_key(&tmux_name, &program);
+                        crate::tmux::send_key(&tmux_name, "Enter");
+                    }
+                }
+
+                let _ = app.pty_manager.spawn_tab(
+                    project.id.clone(),
+                    workspace.name.clone(),
+                    tab.id,
+                    workspace.worktree_path.clone(),
+                    "tmux",
+                    &["attach-session", "-t", &tmux_name],
+                    rows,
+                    cols,
+                );
+            }
+        }
+    }
+}
 
 pub async fn switch_project(app: &mut App, idx: usize) {
     if idx >= app.global_state.projects.len() {
