@@ -174,7 +174,9 @@ impl App {
 
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         let mut events = EventStream::new();
-        let mut refresh_tick = interval(Duration::from_secs(5));
+        // BG-02: safety-net fallback. Event-driven refresh via arm 3 (watcher)
+        // is primary. 30s is RESEARCH §1 + ROADMAP success criterion #1.
+        let mut refresh_tick = interval(Duration::from_secs(30));
         // Heartbeat: keeps the sidebar "working dot" animation advancing
         // without a high-frequency wakeup. Dropped from 1s to 5s now that
         // draw is dirty-gated. (See 02-RESEARCH §2 pitfall #5.)
@@ -231,17 +233,17 @@ impl App {
                     }
                 } => {
                     let _ = event;
-                    self.refresh_diff().await;
-                    self.mark_dirty();
+                    // BG-03: non-blocking. refresh_diff_spawn marks dirty internally.
+                    self.refresh_diff_spawn();
                 }
                 // 4. Heartbeat — 5s tick to advance sidebar working-dot.
                 _ = heartbeat_tick.tick() => {
                     self.mark_dirty();
                 }
-                // 5. Safety-net diff refresh — Phase 5 replaces with event-driven.
+                // 5. BG-02 safety-net. Fires at t=0 (harmless — refresh_diff_spawn
+                //    is idempotent and non-blocking; Pitfall #3), then every 30s.
                 _ = refresh_tick.tick() => {
-                    self.refresh_diff().await;
-                    self.mark_dirty();
+                    self.refresh_diff_spawn();
                 }
                 // 6. Diff-refresh results — drain background refresh_diff_spawn outputs.
                 Some(files) = self.diff_rx.recv() => {
@@ -378,6 +380,12 @@ impl App {
     ///
     /// See `.planning/phases/05-background-work-decoupling/05-RESEARCH.md`
     /// §9 Pattern 2 + §8 Pitfall #5.
+    ///
+    /// `#[allow(dead_code)]` is intentional: production call sites are
+    /// wired in Plan 05-03 (`events.rs` / `workspace.rs` /
+    /// `modal_controller.rs`). Until then, only the BG-05 test exercises
+    /// this method.
+    #[allow(dead_code)]
     pub(crate) fn save_state_spawn(&self) {
         let state = self.global_state.clone();
         let path = self.state_path.clone();
