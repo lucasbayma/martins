@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Architectural Split** - Carve `src/app.rs` into focused modules (event routing, modal controller, workspace lifecycle, draw) so downstream perf work has a clean surface
 - [x] **Phase 2: Event Loop Rewire** - Introduce dirty-flag rendering and input-priority select branches — the two primitives every interaction-latency goal depends on
 - [x] **Phase 3: PTY Input Fluidity** - Typing in the agent pane renders each keystroke immediately, even under heavy PTY output
-- [ ] **Phase 4: Navigation Fluidity** - Sidebar, workspace, and tab switching all respond instantly with no stutter on keyboard or mouse
+- [x] **Phase 4: Navigation Fluidity** - Sidebar, workspace, and tab switching all respond instantly with no stutter on keyboard or mouse
 - [ ] **Phase 5: Background Work Decoupling** - Diff refresh, file watcher, and state save never block the event loop or cause random lag spikes
 - [ ] **Phase 6: Text Selection** - Drag-select + `cmd+c` copy in the PTY pane, Ghostty-style, with a highlight that survives streaming output
 
@@ -82,9 +82,9 @@ Plans:
   4. Switching tabs within a workspace is instantaneous — the previous tab's view is replaced in a single frame
 **Plans:** 3 plans
 Plans:
-- [ ] 04-01-PLAN.md — Wave 0: four failing nav regression-guard tests + make_large_repo fixture (TDD gate for 04-02)
-- [ ] 04-02-PLAN.md — Wave 1: add diff_tx/diff_rx + refresh_diff_spawn + 6th select branch; replace 3 .await call-sites
-- [ ] 04-03-PLAN.md — Wave 2: manual UAT (four feel-tests) + PHASE-SUMMARY.md on approved
+- [x] 04-01-PLAN.md — Wave 0: four failing nav regression-guard tests + make_large_repo fixture (TDD gate for 04-02)
+- [x] 04-02-PLAN.md — Wave 1: add diff_tx/diff_rx + refresh_diff_spawn + 6th select branch; replace 3 .await call-sites
+- [x] 04-03-PLAN.md — Wave 2: manual UAT (four feel-tests) + PHASE-SUMMARY.md on approved
 
 ### Phase 5: Background Work Decoupling
 **Goal**: Eliminate the random lag spikes caused by background work. Git diff refresh becomes event-driven (debounced `notify` events, 30s safety net), file watcher bursts coalesce, and state saves never block input or render.
