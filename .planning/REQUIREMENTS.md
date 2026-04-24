@@ -87,31 +87,31 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PTY-01 | TBD | Pending |
-| PTY-02 | TBD | Pending |
-| PTY-03 | TBD | Pending |
-| NAV-01 | TBD | Pending |
-| NAV-02 | TBD | Pending |
-| NAV-03 | TBD | Pending |
-| NAV-04 | TBD | Pending |
-| SEL-01 | TBD | Pending |
-| SEL-02 | TBD | Pending |
-| SEL-03 | TBD | Pending |
-| SEL-04 | TBD | Pending |
-| BG-01 | TBD | Pending |
-| BG-02 | TBD | Pending |
-| BG-03 | TBD | Pending |
-| BG-04 | TBD | Pending |
-| BG-05 | TBD | Pending |
-| ARCH-01 | TBD | Pending |
-| ARCH-02 | TBD | Pending |
-| ARCH-03 | TBD | Pending |
+| ARCH-01 | Phase 1 (Architectural Split) | Pending |
+| ARCH-02 | Phase 2 (Event Loop Rewire) | Pending |
+| ARCH-03 | Phase 2 (Event Loop Rewire) | Pending |
+| PTY-01 | Phase 3 (PTY Input Fluidity) | Pending |
+| PTY-02 | Phase 3 (PTY Input Fluidity) | Pending |
+| PTY-03 | Phase 3 (PTY Input Fluidity) | Pending |
+| NAV-01 | Phase 4 (Navigation Fluidity) | Pending |
+| NAV-02 | Phase 4 (Navigation Fluidity) | Pending |
+| NAV-03 | Phase 4 (Navigation Fluidity) | Pending |
+| NAV-04 | Phase 4 (Navigation Fluidity) | Pending |
+| BG-01 | Phase 5 (Background Work Decoupling) | Pending |
+| BG-02 | Phase 5 (Background Work Decoupling) | Pending |
+| BG-03 | Phase 5 (Background Work Decoupling) | Pending |
+| BG-04 | Phase 5 (Background Work Decoupling) | Pending |
+| BG-05 | Phase 5 (Background Work Decoupling) | Pending |
+| SEL-01 | Phase 6 (Text Selection) | Pending |
+| SEL-02 | Phase 6 (Text Selection) | Pending |
+| SEL-03 | Phase 6 (Text Selection) | Pending |
+| SEL-04 | Phase 6 (Text Selection) | Pending |
 
 **Coverage:**
 - v1 requirements: 19 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 19 ⚠️ (will be resolved by roadmapper)
+- Mapped to phases: 19 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-23*
-*Last updated: 2026-04-23 after initial definition*
+*Last updated: 2026-04-23 after roadmap creation — traceability populated*
