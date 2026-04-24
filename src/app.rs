@@ -67,6 +67,7 @@ pub struct App {
 
     pub keymap: Keymap,
     pub should_quit: bool,
+    pub(crate) dirty: bool,
     pub watcher: Option<crate::watcher::Watcher>,
     pub last_panes: Option<PaneRects>,
     pub sidebar_items: Vec<SidebarItem>,
@@ -128,6 +129,7 @@ impl App {
 
             keymap: Keymap::default_keymap(),
             should_quit: false,
+            dirty: true,
             watcher,
             last_panes: None,
             sidebar_items: Vec::new(),
@@ -158,13 +160,24 @@ impl App {
             .and_then(|project| self.active_workspace_idx.and_then(|idx| project.active().nth(idx)))
     }
 
+    #[inline]
+    pub(crate) fn mark_dirty(&mut self) {
+        self.dirty = true;
+    }
+
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         let mut events = EventStream::new();
         let mut refresh_tick = interval(Duration::from_secs(5));
-        let mut status_tick = interval(Duration::from_secs(1));
+        // Heartbeat: keeps the sidebar "working dot" animation advancing
+        // without a high-frequency wakeup. Dropped from 1s to 5s now that
+        // draw is dirty-gated. (See 02-RESEARCH §2 pitfall #5.)
+        let mut heartbeat_tick = interval(Duration::from_secs(5));
 
         loop {
-            terminal.draw(|frame| crate::ui::draw::draw(self, frame))?;
+            if self.dirty {
+                terminal.draw(|frame| crate::ui::draw::draw(self, frame))?;
+                self.dirty = false;
+            }
             self.sync_pty_size();
 
             if let Some(name) = self.pending_workspace.take() {
@@ -177,6 +190,7 @@ impl App {
                         });
                     }
                 }
+                self.mark_dirty();
                 continue;
             }
 
@@ -185,13 +199,14 @@ impl App {
             }
 
             tokio::select! {
+                biased;
+
                 Some(Ok(event)) = events.next() => {
+                    self.mark_dirty();
                     crate::events::handle_event(self, event).await;
                 }
-                _ = self.pty_manager.output_notify.notified() => {}
-                _ = status_tick.tick() => {}
-                _ = refresh_tick.tick() => {
-                    self.refresh_diff().await;
+                _ = self.pty_manager.output_notify.notified() => {
+                    self.mark_dirty();
                 }
                 Some(event) = async {
                     if let Some(w) = &mut self.watcher {
@@ -202,6 +217,14 @@ impl App {
                 } => {
                     let _ = event;
                     self.refresh_diff().await;
+                    self.mark_dirty();
+                }
+                _ = heartbeat_tick.tick() => {
+                    self.mark_dirty();
+                }
+                _ = refresh_tick.tick() => {
+                    self.refresh_diff().await;
+                    self.mark_dirty();
                 }
             }
         }
