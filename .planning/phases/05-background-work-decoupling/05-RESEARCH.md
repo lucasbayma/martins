@@ -678,31 +678,36 @@ impl Watcher {
 **Verify with user during discuss-phase or planner review:**
 - A3 is the one most worth asking about — is Shape A's extra ~30-50 LOC worth the ordering-guarantee, or is Shape B fine? Default to Shape B for MVP; user can override to Shape A if they want the belt-and-suspenders.
 
-## 17. Open Questions
+## 17. Open Questions (RESOLVED)
 
 1. **Should `save_state_spawn` upgrade to Shape A (serialized + coalesced queue) or stay at Shape B (per-site spawn)?**
    - What we know: Shape B is ~5 LOC of change per call site + the new `save_state_spawn` helper. Shape A adds ~30-50 LOC + a long-lived consumer task.
    - What's unclear: whether the user values theoretical ordering guarantees over code simplicity.
    - **Recommendation:** start with Shape B; document Shape A as a known-available upgrade in case UAT or post-ship usage surfaces an ordering bug.
+   - **RESOLVED:** Shape B adopted. Plan 05-02 introduces `save_state_spawn` as fire-and-forget per site. Shape A documented in 05-04 PHASE-SUMMARY Deferred Items.
 
 2. **Is the 30s safety-net redundant enough that we can drop it entirely?**
    - What we know: BG-02 explicitly requires a 30s safety-net. ROADMAP success criterion #1 says "only on actual file-system events (or the 30s safety-net fallback)."
    - What's unclear: whether the user would rather have "pure event-driven, no safety net" (simpler, but trusts FSEvents 100%).
    - **Recommendation:** implement as spec'd. BG-02 is a hard requirement.
+   - **RESOLVED:** 30s safety-net retained per BG-02. Plan 05-02 changes `Duration::from_secs(5)` → `Duration::from_secs(30)` at src/app.rs:177.
 
 3. **Should we also move `archive_active_workspace`'s `std::fs::remove_dir_all(&worktree_path)` off-thread?**
    - What we know: it's a synchronous recursive fs op that can block for hundreds of ms on a workspace with many files (especially `node_modules`/`target`). Phase 4 research flagged it as out-of-scope for NAV (archive is destructive, user tolerates a pause) — but Phase 5's BG-05 success criterion #4 says "archiving a workspace feels instant."
    - What's unclear: whether the user interprets "archive is destructive, brief pause is fine" or "archive should also feel instant."
    - **Recommendation:** **include in Phase 5 scope.** Wrap the `remove_dir_all` in `spawn_blocking` from `src/workspace.rs:181`. Low-risk; matches BG-05's literal text. If planner disagrees, document as a follow-up in `05-PHASE-SUMMARY.md`.
+   - **RESOLVED:** Included in scope. Plan 05-03 Task 2 wraps `remove_dir_all` in `spawn_blocking` per BG-05 success criterion #4.
 
 4. **Should we also spawn the tmux ops (`kill_session`, `new_session`, `resize_session`) off-thread during workspace create/archive/delete?**
    - What we know: tmux subprocess spawns are already partially spawn-blocking'd (`src/workspace.rs:288-293` for `new_session`; `src/app.rs:450-454` for resize). But `kill_session` in `archive_active_workspace` (`src/workspace.rs:171`) and several others are inline.
    - What's unclear: whether Phase 5 scope extends into tmux or stays at state+diff only.
    - **Recommendation:** **out of scope for Phase 5.** tmux ops are <20ms typical; not a lag-spike source. Revisit if BG-05 UAT fails on tmux-heavy ops.
+   - **RESOLVED:** Deferred. Documented in 05-04 PHASE-SUMMARY Deferred Items; revisit if BG-05 UAT surfaces tmux-heavy lag.
 
 5. **Should Phase 5 add tracing spans around background task spawns for future regression diagnosis?**
    - What we know: OBS-01 (tracing spans) is v2-deferred.
    - **Recommendation:** out of scope. A few `tracing::debug!("spawned refresh_diff")` / `tracing::debug!("spawned save_state")` in `save_state_spawn` / `refresh_diff_spawn` are ~1 LOC each and cheap; planner may include as a freebie but not required.
+   - **RESOLVED:** Deferred. Documented in 05-04 PHASE-SUMMARY Deferred Items; aligns with v2 OBS-01 placement.
 
 ## 18. Project Constraints (from CLAUDE.md)
 
