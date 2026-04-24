@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Completed 02-01 dirty-flag rendering — 100/100 tests green, clippy clean, 6 mark_dirty call sites, biased;+heartbeat_tick rewired; ready for Plan 02-02
-last_updated: "2026-04-24T14:02:14.375Z"
-last_activity: 2026-04-24
+status: executing
+stopped_at: Completed 03-01 PTY-input fluidity validation — UAT approved all four feel-tests, PTY-01/02/03 closed at Plan 03-01, Plan 03-02 skipped; 103/103 tests green
+last_updated: "2026-04-24T18:30:00.000Z"
+last_activity: 2026-04-24 -- Phase 03 Plan 03-01 complete (UAT approved)
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
-  percent: 33
+  completed_phases: 3
+  total_plans: 10
+  completed_plans: 10
+  percent: 100
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Input-to-pixel responsiveness must feel like a native GPU-accelerated terminal (Ghostty/Alacritty baseline).
-**Current focus:** Phase 02 — event-loop-rewire
+**Current focus:** Phase --phase — 03
 
 ## Current Position
 
-Phase: 3
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-04-24
+Phase: 03 (PTY Input Fluidity) — COMPLETE
+Plan: 1 of 1 (03-02 SKIPPED — UAT approved; frame-budget gate not needed)
+Status: Phase 03 complete; awaiting orchestrator phase-closure verification
+Last activity: 2026-04-24 -- Phase 03 Plan 03-01 complete (UAT approved)
 
 Progress: [██████████] 100%
 
@@ -36,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 9
+- Total plans completed: 10
 - Average duration: —
 - Total execution time: —
 
@@ -59,6 +59,7 @@ Progress: [██████████] 100%
 | Phase 01 P01-04 | ~15m | 3 tasks | 3 files |
 | Phase 01 P01-05 | ~20m | 4 tasks | 5 files |
 | Phase 02 P01 | 2m | 2 tasks | 2 files |
+| Phase 03 P01 | ~15m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Recent decisions affecting current work:
 - Final slim-down (01-05): all 17 App delegators removed (12 planned + 8 event dead-code + fn draw inlined); call sites in events.rs/modal_controller.rs/App::run rewritten to crate::X::fn(app, ...) directly; reattach_tmux_sessions extracted to workspace.rs; tests relocated to src/app_tests.rs via #[path=...] mod tests; src/app.rs at 436 lines (under 500 ROADMAP target)
 - Phase 1 COMPLETE: every ROADMAP Phase 1 success criterion PASS; PHASE-SUMMARY.md written
 - Phase 02-01: dirty-flag rendering installed on App — pub(crate) dirty bool + mark_dirty() helper + dirty-gated terminal.draw in run(); tokio::select! gains biased; with events-first ordering; status_tick(1s) replaced by heartbeat_tick(5s) per RESEARCH pitfall #5
+- Phase 03-01: PTY-input validation — three regression-guard tests (src/pty_input_tests.rs) + write_input doc-comment affirming synchronous-by-design; test module registered in src/main.rs (binary-only crate deviation from plan which said src/lib.rs)
+- Phase 03 closes at Plan 03-01: user UAT approved all four feel-tests → PTY-01/02/03 satisfied by Phase 2 primitives; Plan 03-02 (frame-budget gate) skipped and retained on disk as considered-alternative
 
 ### Pending Todos
 
@@ -101,9 +104,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-24T14:02:14.370Z
-Stopped at: Completed 02-01 dirty-flag rendering — 100/100 tests green, clippy clean, 6 mark_dirty call sites, biased;+heartbeat_tick rewired; ready for Plan 02-02
+Last session: 2026-04-24T18:30:00.000Z
+Stopped at: Completed 03-01 PTY-input fluidity validation — UAT approved all four feel-tests, PTY-01/02/03 closed at Plan 03-01, Plan 03-02 skipped; 103/103 tests green, clippy clean
 Resume file: None
-Next: Phase 2 (Event Loop Rewire) — dirty-flag rendering + input-priority select
+Next: Phase 4 (Navigation Fluidity) — pending orchestrator phase-closure verification of Phase 3
 
-**Planned Phase:** 2 (Event Loop Rewire) — 2 plans — 2026-04-24T13:47:32.634Z
+**Completed Phase:** 3 (PTY Input Fluidity) — 1 of 1 plan executed (03-02 skipped per UAT) — 2026-04-24

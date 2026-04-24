@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Architectural Split** - Carve `src/app.rs` into focused modules (event routing, modal controller, workspace lifecycle, draw) so downstream perf work has a clean surface
 - [x] **Phase 2: Event Loop Rewire** - Introduce dirty-flag rendering and input-priority select branches — the two primitives every interaction-latency goal depends on
-- [ ] **Phase 3: PTY Input Fluidity** - Typing in the agent pane renders each keystroke immediately, even under heavy PTY output
+- [x] **Phase 3: PTY Input Fluidity** - Typing in the agent pane renders each keystroke immediately, even under heavy PTY output
 - [ ] **Phase 4: Navigation Fluidity** - Sidebar, workspace, and tab switching all respond instantly with no stutter on keyboard or mouse
 - [ ] **Phase 5: Background Work Decoupling** - Diff refresh, file watcher, and state save never block the event loop or cause random lag spikes
 - [ ] **Phase 6: Text Selection** - Drag-select + `cmd+c` copy in the PTY pane, Ghostty-style, with a highlight that survives streaming output
@@ -68,8 +68,8 @@ Plans:
   4. `top` / Activity Monitor shows CPU at near-zero when the app is idle with no PTY output
 **Plans:** 2 plans
 Plans:
-- [ ] 03-01-PLAN.md — TDD: three failing PTY-input tests + write_input sync-guarantee doc-comment + manual UAT (PTY-01/02/03)
-- [ ] 03-02-PLAN.md — CONDITIONAL (triggered by 03-01 UAT fail): frame-budget gate in App::run + should_draw helper + sleep_until branch (PTY-01/02)
+- [x] 03-01-PLAN.md — TDD: three failing PTY-input tests + write_input sync-guarantee doc-comment + manual UAT (PTY-01/02/03)
+- [ ] 03-02-PLAN.md — CONDITIONAL (triggered by 03-01 UAT fail): frame-budget gate in App::run + should_draw helper + sleep_until branch (PTY-01/02) — SKIPPED, remains on disk as considered-alternative
 
 ### Phase 4: Navigation Fluidity
 **Goal**: Every way of moving around the app — keyboard sidebar nav, mouse clicks on sidebar items, workspace switching, tab switching — feels instant with no stutter or blank frames.
@@ -114,7 +114,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. Architectural Split | 5/5 | Complete | 2026-04-24 |
 | 2. Event Loop Rewire | 1/2 | In progress | - |
-| 3. PTY Input Fluidity | 0/TBD | Not started | - |
+| 3. PTY Input Fluidity | 1/1 | Complete | 2026-04-24 |
 | 4. Navigation Fluidity | 0/TBD | Not started | - |
 | 5. Background Work Decoupling | 0/TBD | Not started | - |
 | 6. Text Selection | 0/TBD | Not started | - |
