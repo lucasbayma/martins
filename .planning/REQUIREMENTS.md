@@ -37,11 +37,16 @@ Requirements for the fluidity milestone. Each maps to exactly one roadmap phase.
 
 <!-- Diff refresh, file watcher, state persistence must not cause lag spikes. -->
 
-- [ ] **BG-01**: Git diff refresh is event-driven — triggered only by debounced `notify` file-system events, not a 5s periodic timer
-- [ ] **BG-02**: A safety-net timer at 30s (not 5s) re-runs diff as a fallback if no file events fire
-- [ ] **BG-03**: Diff refresh runs as a background tokio task and never blocks the event loop or input path
-- [ ] **BG-04**: File watcher events are debounced (target ~200ms) so bursts of file changes produce at most one diff refresh
-- [ ] **BG-05**: State save (`~/.martins/state.json`) runs asynchronously — it never blocks input or render, even during workspace mutations
+- [x] **BG-01
+**: Git diff refresh is event-driven — triggered only by debounced `notify` file-system events, not a 5s periodic timer
+- [x] **BG-02
+**: A safety-net timer at 30s (not 5s) re-runs diff as a fallback if no file events fire
+- [x] **BG-03
+**: Diff refresh runs as a background tokio task and never blocks the event loop or input path
+- [x] **BG-04
+**: File watcher events are debounced (target ~200ms) so bursts of file changes produce at most one diff refresh
+- [x] **BG-05
+**: State save (`~/.martins/state.json`) runs asynchronously — it never blocks input or render, even during workspace mutations
 
 ### Architecture
 

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-01 Wave-0 regression-guard tests — BG-05 TDD gate armed (save_state_spawn missing-method compile error), BG-04 burst-of-10 test passing on 750ms window
-last_updated: "2026-04-24T21:38:37Z"
-last_activity: 2026-04-24 -- Phase 05 Plan 01 complete (Wave-0 regression-guard tests)
+stopped_at: "Completed 05-02 Wave-1 — App::save_state_spawn primitive + run-loop rewire (30s + non-blocking arms) + 200ms debounce; BG-01/02/03/04/05 all satisfied; Plan 05-03 cleared to wire 13 call sites"
+last_updated: "2026-04-24T22:02:02.668Z"
+last_activity: 2026-04-24
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 16
-  completed_plans: 16
+  completed_plans: 17
   percent: 100
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-23)
 ## Current Position
 
 Phase: 05 (background-work-decoupling) — EXECUTING
-Plan: 2 of 4 (next)
-Status: Executing Phase 05 — Wave 0 complete
-Last activity: 2026-04-24 -- Phase 05 Plan 01 complete (Wave-0 regression-guard tests)
+Plan: 3 of 4 (next)
+Status: Ready to execute
+Last activity: 2026-04-24
 
 Progress: [██████████] 100%
 
@@ -63,6 +63,7 @@ Progress: [██████████] 100%
 | Phase 02 P01 | 2m | 2 tasks | 2 files |
 | Phase 03 P01 | ~15m | 3 tasks | 3 files |
 | Phase 05 P01 | ~10m | 3 tasks | 2 files |
+| Phase 05 P02 | 25 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,8 @@ Recent decisions affecting current work:
 - Phase 03-01: PTY-input validation — three regression-guard tests (src/pty_input_tests.rs) + write_input doc-comment affirming synchronous-by-design; test module registered in src/main.rs (binary-only crate deviation from plan which said src/lib.rs)
 - Phase 03 closes at Plan 03-01: user UAT approved all four feel-tests → PTY-01/02/03 satisfied by Phase 2 primitives; Plan 03-02 (frame-budget gate) skipped and retained on disk as considered-alternative
 - Phase 05-01: Wave-0 regression-guard tests landed — `save_state_spawn_is_nonblocking` (BG-05 TDD gate, fails to compile until Plan 05-02) + `debounce_rapid_burst_of_10` (BG-04 200ms-window guard, passes today on 750ms); Task 3 verification adapted to read app_tests registration from src/app.rs (Phase 1 layout) instead of src/main.rs as plan claimed
+- Phase 05-02: BG-05 primitive App::save_state_spawn lands at src/app.rs:381 (tokio::task::spawn_blocking + Clone-and-move on global_state + state_path); App::run rewired (refresh_tick 5s→30s, watcher arm + refresh_tick arm fire-and-forget); watcher debounce 750ms→200ms; #[allow(dead_code)] on save_state_spawn until Plan 05-03 wires call sites
+- Phase 05-02: 4 deviations all auto-fixed (1 Rule 3 dead_code allow, 3 Rule 1 watcher test fixes — tightened test bursts to back-to-back writes, pre-create noise dirs + drain FSEvents historical buffer in filter_noise); zero assertion loosening, zero #[ignore], zero production code changes beyond the 4 planned edits
 
 ### Pending Todos
 
@@ -108,9 +111,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-24T21:38:37Z
-Stopped at: Completed 05-01 Wave-0 regression-guard tests — BG-05 TDD gate armed (cargo build --tests fails on save_state_spawn missing-method), BG-04 burst-of-10 test passing on 750ms window; production cargo build green
-Resume file: .planning/phases/05-background-work-decoupling/05-02-PLAN.md
+Last session: 2026-04-24T22:02:02.661Z
+Stopped at: Completed 05-02 Wave-1 — App::save_state_spawn primitive + run-loop rewire (30s + non-blocking arms) + 200ms debounce; BG-01/02/03/04/05 all satisfied; Plan 05-03 cleared to wire 13 call sites
+Resume file: None
 Next: Phase 5 Plan 02 (Wave 1) — implement App::save_state_spawn (makes BG-05 gate compile + pass) and tighten watcher debounce 750ms → 200ms
 
 **Completed Phase:** 3 (PTY Input Fluidity) — 1 of 1 plan executed (03-02 skipped per UAT) — 2026-04-24
