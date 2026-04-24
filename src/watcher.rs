@@ -168,4 +168,54 @@ mod tests {
         );
         assert!(count >= 1, "expected at least 1 event");
     }
+
+    /// BG-04 LOAD-BEARING — a burst of 10 rapid file writes (at 20ms
+    /// spacing) produces at most 2 debounced events. On the current
+    /// 750ms window, the 200ms burst trivially lands in one debounce
+    /// cycle. On the post-05-02 200ms window, the burst boundary matches
+    /// the debouncer window but still coalesces to ≤2 events.
+    ///
+    /// This test must PASS both pre-05-02 (window=750ms) and post-05-02
+    /// (window=200ms). If a future debounce retune causes it to fail,
+    /// that is the signal.
+    ///
+    /// See: .planning/phases/05-background-work-decoupling/05-RESEARCH.md
+    /// §12 line 439 + §8 Pitfall #1.
+    #[tokio::test]
+    async fn debounce_rapid_burst_of_10() {
+        let tmp = TempDir::new().unwrap();
+        let mut watcher = Watcher::new().unwrap();
+        watcher.watch(tmp.path()).unwrap();
+
+        std::thread::sleep(Duration::from_millis(100));
+
+        // Write 10 times rapidly at 20ms spacing → 200ms total burst
+        for i in 0..10 {
+            std::fs::write(
+                tmp.path().join("burst10.txt"),
+                format!("write {}", i),
+            )
+            .unwrap();
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        // Drain events until a 2000ms deadline
+        let mut count = 0;
+        let deadline = std::time::Instant::now() + Duration::from_millis(2000);
+        while std::time::Instant::now() < deadline {
+            let remaining = deadline - std::time::Instant::now();
+            let event = timeout(remaining, watcher.next_event()).await;
+            match event {
+                Ok(Some(_)) => count += 1,
+                _ => break,
+            }
+        }
+
+        assert!(
+            count <= 2,
+            "expected at most 2 debounced events from 10-write burst, got {}",
+            count
+        );
+        assert!(count >= 1, "expected at least 1 event from 10-write burst");
+    }
 }
