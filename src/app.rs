@@ -255,7 +255,7 @@ impl App {
             .and_then(|idx| self.global_state.projects.get_mut(idx))
     }
 
-    fn active_workspace(&self) -> Option<&Workspace> {
+    pub(crate) fn active_workspace(&self) -> Option<&Workspace> {
         self.active_project()
             .and_then(|project| self.active_workspace_idx.and_then(|idx| project.active().nth(idx)))
     }
@@ -1600,7 +1600,7 @@ impl App {
         });
     }
 
-    fn build_working_map(&self) -> std::collections::HashMap<(String, String), bool> {
+    pub(crate) fn build_working_map(&self) -> std::collections::HashMap<(String, String), bool> {
         use std::time::Duration;
         let threshold = Duration::from_secs(2);
         let mut map = std::collections::HashMap::new();
@@ -1622,7 +1622,7 @@ impl App {
         map
     }
 
-    fn active_sessions(&self) -> Vec<(u32, &crate::pty::session::PtySession)> {
+    pub(crate) fn active_sessions(&self) -> Vec<(u32, &crate::pty::session::PtySession)> {
         let Some(project) = self.active_project() else {
             return Vec::new();
         };

@@ -1,5 +1,6 @@
 //! Module doc.
 
+pub mod draw;
 pub mod layout;
 pub mod modal;
 pub mod picker;
