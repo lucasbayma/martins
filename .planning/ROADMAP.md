@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Event Loop Rewire** - Introduce dirty-flag rendering and input-priority select branches — the two primitives every interaction-latency goal depends on
 - [x] **Phase 3: PTY Input Fluidity** - Typing in the agent pane renders each keystroke immediately, even under heavy PTY output
 - [x] **Phase 4: Navigation Fluidity** - Sidebar, workspace, and tab switching all respond instantly with no stutter on keyboard or mouse
-- [ ] **Phase 5: Background Work Decoupling** - Diff refresh, file watcher, and state save never block the event loop or cause random lag spikes
+- [x] **Phase 5: Background Work Decoupling** - Diff refresh, file watcher, and state save never block the event loop or cause random lag spikes
 - [ ] **Phase 6: Text Selection** - Drag-select + `cmd+c` copy in the PTY pane, Ghostty-style, with a highlight that survives streaming output
 
 ## Phase Details

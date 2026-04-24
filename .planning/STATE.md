@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 05-03 Wave-2 — 13 hot-path save_state() sites migrated to save_state_spawn() across events.rs/workspace.rs/modal_controller.rs; archive_active_workspace + delete_archived_workspace remove_dir_all wrapped in spawn_blocking; BG-05 fully satisfied; Plan 05-04 (UAT) cleared
-last_updated: "2026-04-24T22:10:38.584Z"
+status: planning
+stopped_at: Phase 5 COMPLETE — UAT 5/5 PASS (BG-01..05 all satisfied), PHASE-SUMMARY.md written, ROADMAP Phase 5 box checked. 109 tests green, clippy clean. Phase 6 (Text Selection) is next.
+last_updated: "2026-04-24T22:30:00.000Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 16
-  completed_plans: 18
+  completed_phases: 5
+  total_plans: 20
+  completed_plans: 20
   percent: 100
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Input-to-pixel responsiveness must feel like a native GPU-accelerated terminal (Ghostty/Alacritty baseline).
-**Current focus:** Phase 05 — background-work-decoupling
+**Current focus:** Phase 06 — text-selection (next)
 
 ## Current Position
 
-Phase: 05 (background-work-decoupling) — EXECUTING
-Plan: 4 of 4 (next)
-Status: Ready to execute
+Phase: 05 (background-work-decoupling) — COMPLETE
+Plan: 4 of 4 (UAT closed 5/5 PASS, PHASE-SUMMARY.md written)
+Status: Ready to plan Phase 6
 Last activity: 2026-04-24
 
 Progress: [██████████] 100%
