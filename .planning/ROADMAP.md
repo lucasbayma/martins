@@ -17,7 +17,7 @@ Success is judged subjectively against Ghostty/Alacritty by the single user — 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Architectural Split** - Carve `src/app.rs` into focused modules (event routing, modal controller, workspace lifecycle, draw) so downstream perf work has a clean surface
-- [ ] **Phase 2: Event Loop Rewire** - Introduce dirty-flag rendering and input-priority select branches — the two primitives every interaction-latency goal depends on
+- [x] **Phase 2: Event Loop Rewire** - Introduce dirty-flag rendering and input-priority select branches — the two primitives every interaction-latency goal depends on
 - [ ] **Phase 3: PTY Input Fluidity** - Typing in the agent pane renders each keystroke immediately, even under heavy PTY output
 - [ ] **Phase 4: Navigation Fluidity** - Sidebar, workspace, and tab switching all respond instantly with no stutter on keyboard or mouse
 - [ ] **Phase 5: Background Work Decoupling** - Diff refresh, file watcher, and state save never block the event loop or cause random lag spikes
