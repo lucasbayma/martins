@@ -89,7 +89,7 @@ pub struct App {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TabClick {
+pub(crate) enum TabClick {
     Select(usize),
     Close(usize),
     Add,
@@ -312,7 +312,7 @@ impl App {
         Ok(())
     }
 
-    async fn refresh_diff(&mut self) {
+    pub(crate) async fn refresh_diff(&mut self) {
         let (path, base_branch) = match (self.active_project(), self.active_workspace()) {
             (Some(_), Some(ws)) => (ws.worktree_path.clone(), ws.base_branch.clone()),
             (Some(p), None) => (p.repo_root.clone(), p.base_branch.clone()),
@@ -894,7 +894,7 @@ impl App {
         }
     }
 
-    fn open_new_tab_picker(&mut self) {
+    pub(crate) fn open_new_tab_picker(&mut self) {
         self.picker = Some(Picker::new(
             vec![
                 "opencode".to_string(),
@@ -911,7 +911,7 @@ impl App {
         ));
     }
 
-    fn select_active_workspace(&mut self, index: usize) {
+    pub(crate) fn select_active_workspace(&mut self, index: usize) {
         self.active_workspace_idx = Some(index);
         self.right_list.select(None);
     }
@@ -931,7 +931,7 @@ impl App {
         }
     }
 
-    async fn switch_project(&mut self, idx: usize) {
+    pub(crate) async fn switch_project(&mut self, idx: usize) {
         if idx >= self.global_state.projects.len() {
             return;
         }
@@ -974,7 +974,7 @@ impl App {
         self.save_state();
     }
 
-    fn archive_active_workspace(&mut self) {
+    pub(crate) fn archive_active_workspace(&mut self) {
         let Some(ws) = self.active_workspace() else { return };
         let ws_name = ws.name.clone();
         let worktree_path = ws.worktree_path.clone();
@@ -997,7 +997,7 @@ impl App {
         let _ = std::fs::remove_dir_all(&worktree_path);
     }
 
-    fn delete_archived_workspace(&mut self, project_idx: usize, archived_idx: usize) {
+    pub(crate) fn delete_archived_workspace(&mut self, project_idx: usize, archived_idx: usize) {
         let Some(project) = self.global_state.projects.get(project_idx) else { return };
         let Some(ws) = project.archived().nth(archived_idx) else { return };
         let ws_name = ws.name.clone();
@@ -1031,7 +1031,7 @@ impl App {
         self.save_state();
     }
 
-    fn write_active_tab_input(&mut self, bytes: &[u8]) {
+    pub(crate) fn write_active_tab_input(&mut self, bytes: &[u8]) {
         let Some(project) = self.active_project() else { return };
         let Some(workspace) = self.active_workspace() else { return };
 
@@ -1053,7 +1053,7 @@ impl App {
         let _ = self.pty_manager.write_input(&project_id, &ws_name, tab_id, bytes);
     }
 
-    fn copy_selection_to_clipboard(&self) {
+    pub(crate) fn copy_selection_to_clipboard(&self) {
         let Some(sel) = &self.selection else { return };
         if sel.is_empty() {
             return;
@@ -1084,7 +1084,7 @@ impl App {
             });
     }
 
-    fn forward_key_to_pty(&mut self, key: &KeyEvent) {
+    pub(crate) fn forward_key_to_pty(&mut self, key: &KeyEvent) {
         let Some(bytes) = key_to_bytes(key) else { return };
         self.write_active_tab_input(&bytes);
     }
@@ -1296,7 +1296,7 @@ impl App {
         Ok(())
     }
 
-    fn tab_at_column(&self, terminal: Rect, col: u16) -> Option<TabClick> {
+    pub(crate) fn tab_at_column(&self, terminal: Rect, col: u16) -> Option<TabClick> {
         let workspace = self.active_workspace()?;
         let mut current_col = terminal.x;
         for (idx, tab) in workspace.tabs.iter().enumerate() {
