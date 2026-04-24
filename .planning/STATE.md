@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 5 COMPLETE — UAT 5/5 PASS (BG-01..05 all satisfied), PHASE-SUMMARY.md written, ROADMAP Phase 5 box checked. 109 tests green, clippy clean. Phase 6 (Text Selection) is next.
-last_updated: "2026-04-24T22:30:00.000Z"
+stopped_at: Phase 6 context gathered
+last_updated: "2026-04-24T22:48:13.984Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 20
-  completed_plans: 20
+  total_plans: 16
+  completed_plans: 19
   percent: 100
 ---
 
@@ -113,9 +113,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-24T22:10:30.098Z
-Stopped at: Completed 05-03 Wave-2 — 13 hot-path save_state() sites migrated to save_state_spawn() across events.rs/workspace.rs/modal_controller.rs; archive_active_workspace + delete_archived_workspace remove_dir_all wrapped in spawn_blocking; BG-05 fully satisfied; Plan 05-04 (UAT) cleared
-Resume file: None
+Last session: --stopped-at
+Stopped at: Phase 6 context gathered
+Resume file: --resume-file
 Next: Phase 5 Plan 02 (Wave 1) — implement App::save_state_spawn (makes BG-05 gate compile + pass) and tighten watcher debounce 750ms → 200ms
 
 **Completed Phase:** 3 (PTY Input Fluidity) — 1 of 1 plan executed (03-02 skipped per UAT) — 2026-04-24
