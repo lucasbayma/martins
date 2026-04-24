@@ -173,6 +173,7 @@ pub async fn handle_click(app: &mut App, col: u16, row: u16) {
     {
         let local_row = (row - left.y - 1) as usize;
         if let Some(item) = app.sidebar_items.get(local_row).cloned() {
+            app.left_list.select(Some(local_row));
             match item {
                 SidebarItem::RemoveProject(idx) => {
                     let delete_zone_start = left.x + left.width.saturating_sub(4);
