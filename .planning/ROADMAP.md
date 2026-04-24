@@ -16,7 +16,7 @@ Success is judged subjectively against Ghostty/Alacritty by the single user — 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Architectural Split** - Carve `src/app.rs` into focused modules (event routing, modal controller, workspace lifecycle, draw) so downstream perf work has a clean surface
+- [x] **Phase 1: Architectural Split** - Carve `src/app.rs` into focused modules (event routing, modal controller, workspace lifecycle, draw) so downstream perf work has a clean surface
 - [ ] **Phase 2: Event Loop Rewire** - Introduce dirty-flag rendering and input-priority select branches — the two primitives every interaction-latency goal depends on
 - [ ] **Phase 3: PTY Input Fluidity** - Typing in the agent pane renders each keystroke immediately, even under heavy PTY output
 - [ ] **Phase 4: Navigation Fluidity** - Sidebar, workspace, and tab switching all respond instantly with no stutter on keyboard or mouse
@@ -41,7 +41,7 @@ Plans:
 - [x] 01-02-PLAN.md — Extract modal dispatch into src/ui/modal_controller.rs
 - [x] 01-03-PLAN.md — Extract event routing into src/events.rs
 - [x] 01-04-PLAN.md — Extract workspace lifecycle into src/workspace.rs
-- [ ] 01-05-PLAN.md — Final slim-down of src/app.rs to ≤500 lines
+- [x] 01-05-PLAN.md — Final slim-down of src/app.rs to ≤500 lines
 
 ### Phase 2: Event Loop Rewire
 **Goal**: Install the two structural perf primitives every interaction-latency requirement depends on — a dirty-flag that gates `terminal.draw()`, and a dedicated higher-priority input branch in the `tokio::select!` loop so PTY output and timers can't starve keyboard/mouse events.
@@ -105,7 +105,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Architectural Split | 4/5 | In progress | - |
+| 1. Architectural Split | 5/5 | Complete | 2026-04-24 |
 | 2. Event Loop Rewire | 0/TBD | Not started | - |
 | 3. PTY Input Fluidity | 0/TBD | Not started | - |
 | 4. Navigation Fluidity | 0/TBD | Not started | - |

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 01-04 workspace-lifecycle extraction (auto-approved Task 3 checkpoint; Wave 4 done; src/app.rs 926->700 lines)
-last_updated: "2026-04-24T10:15:00.000Z"
+status: phase-complete
+stopped_at: Completed 01-05 final slim-down — Phase 1 DONE (src/app.rs 700->436, under ≤500 ROADMAP target; all 5 Phase 1 success criteria PASS)
+last_updated: "2026-04-24T11:00:00.000Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-23)
 
 ## Current Position
 
-Phase: 01 (architectural-split) — EXECUTING
-Plan: 5 of 5
-Status: Executing (Wave 4 complete)
+Phase: 01 (architectural-split) — COMPLETE
+Plan: 5 of 5 (DONE)
+Status: Phase 1 complete — ready for Phase 2
 Last activity: 2026-04-24
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [████████░░] 80%
 | Phase 01 P01-02 | ~15m | 2 tasks | 3 files |
 | Phase 01 P01-03 | ~20m | 3 tasks | 3 files |
 | Phase 01 P01-04 | ~15m | 3 tasks | 3 files |
+| Phase 01 P01-05 | ~20m | 4 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - App delegator dead-code pattern: #[allow(dead_code)] keeps plan-prescribed delegators when intra-module call paths route through crate::events::* directly
 - Workspace lifecycle extracted (01-04): src/workspace.rs owns 9 lifecycle free functions (switch_project/create_workspace/create_tab/add_project_from_path/archive_active_workspace/delete_archived_workspace/confirm_delete_workspace/confirm_remove_project/queue_workspace_creation) + tab_program_for_new/resume helpers; App methods become one-line delegators; subprocess call ordering preserved verbatim
 - save_state / refresh_active_workspace_after_change / select_active_workspace stay in app.rs as App-field-only helpers — workspace.rs calls them via app.*
+- Final slim-down (01-05): all 17 App delegators removed (12 planned + 8 event dead-code + fn draw inlined); call sites in events.rs/modal_controller.rs/App::run rewritten to crate::X::fn(app, ...) directly; reattach_tmux_sessions extracted to workspace.rs; tests relocated to src/app_tests.rs via #[path=...] mod tests; src/app.rs at 436 lines (under 500 ROADMAP target)
+- Phase 1 COMPLETE: every ROADMAP Phase 1 success criterion PASS; PHASE-SUMMARY.md written
 
 ### Pending Todos
 
@@ -95,6 +98,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-24T10:15:00.000Z
-Stopped at: Completed 01-04 workspace-lifecycle extraction (auto-approved Task 3 checkpoint; src/app.rs 926->700 lines; Wave 4 done)
+Last session: 2026-04-24T11:00:00.000Z
+Stopped at: Completed 01-05 final slim-down — Phase 1 DONE (src/app.rs 700->436, under ≤500 ROADMAP target; all 5 Phase 1 success criteria PASS; PHASE-SUMMARY.md written)
 Resume file: None
+Next: Phase 2 (Event Loop Rewire) — dirty-flag rendering + input-priority select
