@@ -131,6 +131,23 @@ impl PtySession {
             .unwrap_or(false)
     }
 
+    /// Write bytes to the PTY master writer.
+    ///
+    /// This is **synchronous by design** (PTY-01, PTY-02). Keystroke-sized
+    /// writes (≤8 bytes) never block on a macOS PTY slave buffer (typical
+    /// buffer size 4–16 KiB). Do NOT move this onto a `tokio::task::spawn`:
+    /// the synchronous `write_all` + `flush` guarantees the keystroke lands
+    /// in the child's stdin before the caller returns, which preserves the
+    /// ordering of rapid keystrokes typed into the PTY pane.
+    ///
+    /// Large writes (paste >4 KiB) may block briefly; that case is
+    /// acceptable because a user pasting is aware of the I/O. If a future
+    /// profile flags paste blocking the event loop, chunk the paste write
+    /// across multiple select iterations — do NOT make keystroke writes
+    /// async.
+    ///
+    /// See `.planning/phases/03-pty-input-fluidity/03-RESEARCH.md` §Common
+    /// Pitfalls #2.
     pub fn write_input(&mut self, data: &[u8]) -> Result<()> {
         let writer = self
             .writer
