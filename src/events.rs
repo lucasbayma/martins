@@ -628,7 +628,7 @@ pub(crate) fn menu_action_at_column(col: u16) -> Option<Action> {
         .map(|(_, _, action)| action.clone())
 }
 
-fn key_to_bytes(key: &KeyEvent) -> Option<Vec<u8>> {
+pub(crate) fn key_to_bytes(key: &KeyEvent) -> Option<Vec<u8>> {
     use crossterm::event::{KeyCode, KeyModifiers};
 
     let mods = key.modifiers;
