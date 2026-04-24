@@ -35,7 +35,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Modal dispatch lives in its own module (`src/ui/modal_controller.rs` or equivalent)
   4. Workspace lifecycle (create/archive/delete) lives in its own module (`src/workspace.rs` or equivalent)
   5. The app compiles, runs, and behaves identically to pre-refactor from the user's perspective — no regressions in existing flows
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 01-01-PLAN.md — Extract draw orchestration into src/ui/draw.rs
+- [ ] 01-02-PLAN.md — Extract modal dispatch into src/ui/modal_controller.rs
+- [ ] 01-03-PLAN.md — Extract event routing into src/events.rs
+- [ ] 01-04-PLAN.md — Extract workspace lifecycle into src/workspace.rs
+- [ ] 01-05-PLAN.md — Final slim-down of src/app.rs to ≤500 lines
 
 ### Phase 2: Event Loop Rewire
 **Goal**: Install the two structural perf primitives every interaction-latency requirement depends on — a dirty-flag that gates `terminal.draw()`, and a dedicated higher-priority input branch in the `tokio::select!` loop so PTY output and timers can't starve keyboard/mouse events.
