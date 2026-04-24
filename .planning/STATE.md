@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-02 modal controller extraction (auto-approved Task 3 checkpoint; Wave 2 resumed after API interruption)
-last_updated: "2026-04-24T09:00:00.000Z"
+stopped_at: Completed 01-03 event-routing extraction (auto-approved Task 4 checkpoint; Wave 3 done; src/app.rs 1568->926 lines)
+last_updated: "2026-04-24T10:00:00.000Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
-  percent: 40
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-23)
 ## Current Position
 
 Phase: 01 (architectural-split) — EXECUTING
-Plan: 3 of 5
-Status: Executing (Wave 2 complete)
+Plan: 4 of 5
+Status: Executing (Wave 3 complete)
 Last activity: 2026-04-24
 
-Progress: [██░░░░░░░░] 20%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
@@ -53,6 +53,8 @@ Progress: [██░░░░░░░░] 20%
 
 *Updated after each plan completion*
 | Phase 01 P01-01 | 15m | 2 tasks | 3 files |
+| Phase 01 P01-02 | ~15m | 2 tasks | 3 files |
+| Phase 01 P01-03 | ~20m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -68,6 +70,9 @@ Recent decisions affecting current work:
 - No platform expansion — macOS-only stays
 - Draw orchestration free-function pattern (ui::draw) established for phase-1 extractions
 - App::active_workspace, build_working_map, active_sessions elevated to pub(crate) for module extraction
+- Modal controller extracted (01-02): free-function + std::mem::take pattern preserved
+- Event routing extracted (01-03): src/events.rs owns handle_event/key/mouse/click/scroll + dispatch_action; TabClick + 10 App methods promoted to pub(crate); crate::events::key_to_bytes pub(crate) for App::forward_key_to_pty
+- App delegator dead-code pattern: #[allow(dead_code)] keeps plan-prescribed delegators when intra-module call paths route through crate::events::* directly
 
 ### Pending Todos
 
@@ -87,6 +92,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-24T08:50:41.678Z
-Stopped at: Completed 01-01 draw extraction (auto-approved Task 3 checkpoint)
+Last session: 2026-04-24T10:00:00.000Z
+Stopped at: Completed 01-03 event-routing extraction (auto-approved Task 4 checkpoint; src/app.rs 1568->926 lines; Wave 3 done)
 Resume file: None
