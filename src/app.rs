@@ -201,18 +201,13 @@ impl App {
     }
 
     /// Clear any active text selection and mark the frame dirty IFF a
-    /// selection actually existed (D-22, D-23). Called at every tab/
-    /// workspace switch site by downstream Plan 06; centralized here so
-    /// callers stay one-liners and the dirty-flag discipline is uniform.
+    /// selection actually existed (D-22, D-23). Called from
+    /// `set_active_tab`, `select_active_workspace`, and the four
+    /// `active_workspace_idx`-write sites in `src/workspace.rs`.
     ///
     /// Avoids spurious redraws via the `take().is_some()` guard — if the
     /// user has no active selection, calling this is a no-op.
-    ///
-    /// `#[allow(dead_code)]` until Plan 06-06 wires the call sites at every
-    /// tab/workspace switch. Mirrors the `save_state_spawn` precedent
-    /// (Plan 05-02 → 05-03).
     #[inline]
-    #[allow(dead_code)]
     pub(crate) fn clear_selection(&mut self) {
         if self.selection.take().is_some() {
             self.mark_dirty();
@@ -391,8 +386,23 @@ impl App {
     }
 
     pub(crate) fn select_active_workspace(&mut self, index: usize) {
+        // D-22: per-session anchored gen — cross-workspace highlight is meaningless.
+        self.clear_selection();
         self.active_workspace_idx = Some(index);
         self.right_list.select(None);
+    }
+
+    /// Canonical tab-switch primitive. D-22: clears any active selection
+    /// first, because anchored (gen, row, col) coords are per-session and
+    /// meaningless across tabs. D-23: unconditionally marks dirty so the
+    /// tab-strip repaints regardless of whether a selection existed.
+    /// Downstream call sites in `src/workspace.rs` and `src/events.rs`
+    /// route through this instead of writing `self.active_tab = ...`
+    /// directly.
+    pub(crate) fn set_active_tab(&mut self, index: usize) {
+        self.clear_selection();
+        self.active_tab = index;
+        self.mark_dirty();
     }
 
     pub(crate) fn refresh_active_workspace_after_change(&mut self) {
