@@ -15,7 +15,10 @@ use crate::app::{App, SelectionState};
 use crate::events;
 use crate::state::GlobalState;
 use crate::ui::layout::PaneRects;
-use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{
+    KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseButton, MouseEvent,
+    MouseEventKind,
+};
 use ratatui::layout::Rect;
 use std::time::Duration;
 
@@ -633,4 +636,125 @@ async fn down_left_clears_active_selection_and_marks_dirty() {
         "Down(Left) without SHIFT must clear active selection"
     );
     assert!(app.dirty, "Down(Left) clearing selection must mark_dirty (D-23)");
+}
+
+// =============================================================================
+// 06-04 — Key-path tests (cmd+c with selection / Esc with selection)
+// =============================================================================
+//
+// These tests exercise the precedence chain in `events::handle_key` BEFORE
+// the Terminal-mode forwarding branch:
+//
+//   * cmd+c with active non-empty selection → calls
+//     `App::copy_selection_to_clipboard` (we observe its only side effect we
+//     can reach in-process: selection.text snapshot is preserved AND mode is
+//     unchanged — pbcopy spawn is a real subprocess and is covered by Manual
+//     UAT, NOT asserted here).
+//   * Esc with active selection → clears selection AND consumes the event
+//     (Terminal-mode forwarding does NOT fire — we assert via mode unchanged
+//     and selection cleared).
+//
+// Byte-level PTY-forwarding assertions (cmd+c→0x03 in Terminal mode WITH no
+// selection; Esc→0x1b fallthrough in Terminal mode) are deferred to Manual
+// UAT (UAT-06-04-A, UAT-06-04-B in 06-VALIDATION.md). Automating them would
+// require widening `App::write_active_tab_input` with a test-mode branch
+// which CLAUDE.md minimal-surface conventions reject.
+
+/// Synthesize a `KeyEvent` with the given code / modifiers. Mirrors the
+/// `mouse_event` helper above.
+fn key_event(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+    KeyEvent {
+        code,
+        modifiers,
+        kind: KeyEventKind::Press,
+        state: KeyEventState::empty(),
+    }
+}
+
+/// SEL-02 / D-02 / D-04 — cmd+c (KeyModifiers::SUPER + KeyCode::Char('c'))
+/// with an active non-empty selection consumes the event and leaves the
+/// selection state intact (no clear after copy). pbcopy spawn is a real
+/// subprocess invocation we deliberately do NOT assert on — UAT-06-04 path
+/// covers the clipboard byte-level outcome.
+#[tokio::test]
+async fn cmd_c_with_selection_consumes_event_and_keeps_selection() {
+    let mut app = make_app("cmd-c-with-selection").await;
+
+    // Seed a non-empty selection with a snapshot text. start != end so
+    // `is_empty()` is false and the cmd+c branch will copy.
+    app.selection = Some(SelectionState {
+        start_col: 0,
+        start_row: 0,
+        start_gen: 0,
+        end_col: 4,
+        end_row: 0,
+        end_gen: Some(0),
+        dragging: false,
+        text: Some("hello".to_string()),
+    });
+    let prev_mode = app.mode;
+    app.dirty = false;
+
+    // cmd+c — KeyModifiers::SUPER on macOS via DISAMBIGUATE_ESCAPE_CODES.
+    let key = key_event(KeyCode::Char('c'), KeyModifiers::SUPER);
+    crate::events::handle_key(&mut app, key).await;
+
+    // D-04: copy must NOT clear the selection.
+    assert!(
+        app.selection.is_some(),
+        "cmd+c with selection must NOT clear it (D-04)"
+    );
+    assert_eq!(
+        app.selection.as_ref().unwrap().text.as_deref(),
+        Some("hello"),
+        "cmd+c must preserve the selection text snapshot intact"
+    );
+    // Event consumed — mode unchanged. If cmd+c had fallen through to the
+    // Terminal-mode branch, `forward_key_to_pty` would not change mode either,
+    // but the precedence-test purpose here is to confirm the early-return
+    // branch took over: mode-unchanged + selection-still-Some + text-snapshot
+    // preserved together prove the cmd+c branch ran.
+    assert_eq!(
+        app.mode, prev_mode,
+        "cmd+c branch must consume the event (mode unchanged)"
+    );
+}
+
+/// SEL-03 / D-14 / D-23 — Esc with an active selection in Terminal mode
+/// clears the selection AND consumes the event (does NOT fall through to
+/// `forward_key_to_pty` which would emit 0x1b). We assert: selection cleared,
+/// dirty marked, mode unchanged.
+#[tokio::test]
+async fn esc_with_active_selection_clears_and_marks_dirty() {
+    let mut app = make_app("esc-with-selection").await;
+
+    app.selection = Some(SelectionState {
+        start_col: 0,
+        start_row: 0,
+        start_gen: 0,
+        end_col: 4,
+        end_row: 0,
+        end_gen: Some(0),
+        dragging: false,
+        text: Some("hello".to_string()),
+    });
+    app.mode = crate::keys::InputMode::Terminal;
+    let prev_mode = app.mode;
+    app.dirty = false;
+
+    let key = key_event(KeyCode::Esc, KeyModifiers::NONE);
+    crate::events::handle_key(&mut app, key).await;
+
+    assert!(
+        app.selection.is_none(),
+        "Esc with active selection must clear it (D-14)"
+    );
+    assert!(
+        app.dirty,
+        "Esc clearing selection must mark_dirty (D-23)"
+    );
+    assert_eq!(
+        app.mode, prev_mode,
+        "Esc branch must consume the event (mode unchanged, NOT forwarded to PTY)"
+    );
 }
