@@ -35,7 +35,12 @@ fn ensure_config() -> PathBuf {
          set -g default-terminal \"xterm-256color\"\n\
          set -g allow-passthrough off\n\
          set -g escape-time 0\n\
-         setw -g alternate-screen off\n",
+         setw -g alternate-screen off\n\
+         # Phase 7: pipe selection-via-keyboard to macOS pbcopy (mouse-drag-end already piped by tmux 3.6a default).\n\
+         bind-key -T copy-mode-vi y     send-keys -X copy-pipe-and-cancel \"pbcopy\"\n\
+         bind-key -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel \"pbcopy\"\n\
+         # Phase 7: vi-mode Esc defaults to clear-selection — override to cancel for single-press exit.\n\
+         bind-key -T copy-mode-vi Escape send-keys -X cancel\n",
     );
     config_path
 }
@@ -146,6 +151,57 @@ pub fn pane_command(name: &str) -> Option<String> {
 pub fn send_key(name: &str, key: &str) {
     let _ = Command::new("tmux")
         .args(["send-keys", "-t", name, key])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+}
+
+/// Read the latest tmux paste-buffer for `session` and pipe it to pbcopy.
+/// Returns true on full success (buffer non-empty AND pbcopy succeeded).
+///
+/// Per 07-RESEARCH.md §Subprocess Behavior: `tmux save-buffer -` exits 0
+/// with non-empty stdout when buffer present; exits 1 with stderr "no buffers"
+/// when none. We treat both failure modes (non-zero exit OR empty stdout) as
+/// "no buffer available" — caller falls through to the next cmd+c tier.
+///
+/// Mirrors src/tmux.rs::pane_command (piped stdout) + src/app.rs:492-501
+/// (pbcopy spawn-and-write).
+pub fn save_buffer_to_pbcopy(session: &str) -> bool {
+    use std::process::{Command, Stdio};
+    let Ok(buf_proc) = Command::new("tmux")
+        .args(["save-buffer", "-", "-t", session])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    else {
+        return false;
+    };
+    let Ok(output) = buf_proc.wait_with_output() else {
+        return false;
+    };
+    if !output.status.success() || output.stdout.is_empty() {
+        return false;
+    }
+    let Ok(mut pbcopy) = Command::new("pbcopy").stdin(Stdio::piped()).spawn() else {
+        return false;
+    };
+    if let Some(stdin) = pbcopy.stdin.as_mut() {
+        use std::io::Write;
+        let _ = stdin.write_all(&output.stdout);
+    }
+    let _ = pbcopy.wait();
+    true
+}
+
+/// Fire-and-forget `tmux send-keys -X cancel`. Idempotent: tmux exits 1 with
+/// stderr "not in a mode" when no copy-mode is active — both stdout & stderr
+/// are discarded (mirrors src/tmux.rs::send_key). Use on Esc fallback /
+/// tab-switch / workspace-switch.
+///
+/// Per 07-RESEARCH.md §Subprocess Behavior verified empirically on tmux 3.6a.
+pub fn cancel_copy_mode(session: &str) {
+    let _ = Command::new("tmux")
+        .args(["send-keys", "-X", "cancel", "-t", session])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status();
