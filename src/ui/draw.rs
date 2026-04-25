@@ -69,6 +69,14 @@ pub fn draw(app: &mut crate::app::App, frame: &mut Frame) {
         path: ws.worktree_path.to_string_lossy().to_string(),
     });
 
+    // D-06 / SEL-04: load the active session's scroll_generation snapshot so
+    // the renderer can translate anchored selection endpoints to the current
+    // visible rows. Defaults to 0 when no active session is registered.
+    let current_gen = active_sessions
+        .get(active_tab)
+        .map(|(_, s)| s.scroll_generation.load(std::sync::atomic::Ordering::Relaxed))
+        .unwrap_or(0);
+
     terminal::render(
         frame,
         panes.terminal,
@@ -81,6 +89,7 @@ pub fn draw(app: &mut crate::app::App, frame: &mut Frame) {
         true,
         ws_info.as_ref(),
         app.selection.as_ref(),
+        current_gen,
     );
 
     crate::ui::draw::status_bar(app, frame, panes.status_bar);

@@ -45,6 +45,7 @@ pub fn render(
     focused: bool,
     workspace_info: Option<&WorkspaceInfo>,
     selection: Option<&SelectionState>,
+    current_gen: u64,
 ) {
     if tab_specs.is_empty() {
         let block = Block::default()
@@ -155,21 +156,42 @@ pub fn render(
 
     if let Some(sel) = selection {
         if !sel.is_empty() {
-            let ((sc, sr), (ec, er)) = sel.normalized();
-            let buf = frame.buffer_mut();
-            for row in sr..=er {
-                if row >= inner.height {
-                    break;
-                }
-                let c_start = if row == sr { sc } else { 0 };
-                let c_end = if row == er { ec } else { inner.width.saturating_sub(1) };
-                for col in c_start..=c_end {
-                    if col >= inner.width {
+            let ((sc_raw, sr_raw), (ec_raw, er_raw)) = sel.normalized();
+            // D-06: translate anchored rows to current-screen rows.
+            // current_row = anchored_row - (current_gen - sel_gen)
+            let start_delta = current_gen.saturating_sub(sel.start_gen);
+            // D-07: mid-drag end is cursor-relative — delta=0 when end_gen is None.
+            let end_delta = sel
+                .end_gen
+                .map(|g| current_gen.saturating_sub(g))
+                .unwrap_or(0);
+            let sr_translated = (sr_raw as i64) - (start_delta as i64);
+            let er_translated = (er_raw as i64) - (end_delta as i64);
+            // D-08: if entire selection has scrolled off (end row above top),
+            // render nothing — but SelectionState stays in app state.
+            if er_translated >= 0 {
+                let sr = sr_translated.max(0) as u16;
+                let er = er_translated.max(0) as u16;
+                // D-08: clip start column to 0 if the start row was clipped.
+                let sc = if sr_translated < 0 { 0 } else { sc_raw };
+                let ec = ec_raw;
+                let buf = frame.buffer_mut();
+                for row in sr..=er {
+                    if row >= inner.height {
                         break;
                     }
-                    if let Some(cell) = buf.cell_mut((inner.x + col, inner.y + row)) {
-                        cell.set_bg(theme::ACCENT_GOLD);
-                        cell.set_fg(theme::BG_SURFACE);
+                    let c_start = if row == sr { sc } else { 0 };
+                    let c_end = if row == er { ec } else { inner.width.saturating_sub(1) };
+                    for col in c_start..=c_end {
+                        if col >= inner.width {
+                            break;
+                        }
+                        if let Some(cell) = buf.cell_mut((inner.x + col, inner.y + row)) {
+                            // D-20 + D-21: XOR REVERSED — already-reversed cells
+                            // un-reverse, making the highlight visually distinct
+                            // from surrounding vt100 reverse-video.
+                            cell.modifier.toggle(Modifier::REVERSED);
+                        }
                     }
                 }
             }
@@ -177,6 +199,56 @@ pub fn render(
     }
 
 
+}
+
+/// #[cfg(test)] shim mirroring the production highlight pass over an
+/// arbitrary `Rect` + `SelectionState`. Lets the render tests exercise
+/// REVERSED toggling and anchored-coord translation without spawning a
+/// PtySession or constructing the full `tab_specs`/`sessions` argument
+/// fan-out that `render` requires.
+#[cfg(test)]
+pub(crate) fn render_with_selection_for_test(
+    frame: &mut ratatui::Frame,
+    area: ratatui::layout::Rect,
+    selection: Option<&crate::app::SelectionState>,
+    current_gen: u64,
+) {
+    let inner = area;
+    let Some(sel) = selection else { return };
+    if sel.is_empty() {
+        return;
+    }
+    let ((sc_raw, sr_raw), (ec_raw, er_raw)) = sel.normalized();
+    let start_delta = current_gen.saturating_sub(sel.start_gen);
+    let end_delta = sel
+        .end_gen
+        .map(|g| current_gen.saturating_sub(g))
+        .unwrap_or(0);
+    let sr_translated = (sr_raw as i64) - (start_delta as i64);
+    let er_translated = (er_raw as i64) - (end_delta as i64);
+    if er_translated < 0 {
+        return;
+    }
+    let sr = sr_translated.max(0) as u16;
+    let er = er_translated.max(0) as u16;
+    let sc = if sr_translated < 0 { 0 } else { sc_raw };
+    let ec = ec_raw;
+    let buf = frame.buffer_mut();
+    for row in sr..=er {
+        if row >= inner.height {
+            break;
+        }
+        let c_start = if row == sr { sc } else { 0 };
+        let c_end = if row == er { ec } else { inner.width.saturating_sub(1) };
+        for col in c_start..=c_end {
+            if col >= inner.width {
+                break;
+            }
+            if let Some(cell) = buf.cell_mut((inner.x + col, inner.y + row)) {
+                cell.modifier.toggle(Modifier::REVERSED);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -191,7 +263,7 @@ mod tests {
 
         terminal
             .draw(|frame| {
-                render(frame, frame.area(), &[], &[], 0, InputMode::Normal, false, None, None);
+                render(frame, frame.area(), &[], &[], 0, InputMode::Normal, false, None, None, 0);
             })
             .unwrap();
 
@@ -208,7 +280,7 @@ mod tests {
 
         terminal
             .draw(|frame| {
-                render(frame, frame.area(), &[], &[], 0, InputMode::Terminal, true, None, None);
+                render(frame, frame.area(), &[], &[], 0, InputMode::Terminal, true, None, None, 0);
             })
             .unwrap();
     }
