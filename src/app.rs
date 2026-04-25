@@ -716,6 +716,14 @@ impl App {
             dragging: false,
             text: None,
         };
+        // MINOR-02: triple-click on a blank/whitespace-only row produces an
+        // empty selection (start_col == end_col == 0, start_row == end_row).
+        // Match Ghostty: leave any prior selection untouched and skip
+        // mark_dirty so we don't create an invisible-but-present selection
+        // the user has to dismiss with an extra click.
+        if new_sel.is_empty() {
+            return;
+        }
         let text = self.materialize_selection_text(&new_sel);
         self.selection = Some(SelectionState {
             text: Some(text),
