@@ -118,7 +118,7 @@ Plans:
 ### Phase 7: tmux-native main-screen selection
 **Goal**: Migrate main-pane text selection from Martins' REVERSED-XOR overlay to the underlying tmux session's native copy-mode, so selection in the PTY pane feels indistinguishable from running tmux directly. Operator-flagged during Phase 6 UAT 2026-04-25 — current overlay works but feels non-native vs tmux's own selection.
 **Depends on**: Phase 6
-**Requirements**: TBD
+**Requirements**: SEL-01, SEL-02, SEL-03, SEL-04 (carried-forward from Phase 6 — Phase 7 is feel-iteration, must hold in BOTH overlay AND tmux paths; no new REQ-IDs allocated)
 
 **Investigation surface:**
 - Does Martins' main pane render the tmux session directly enough to enable tmux's copy-mode bindings (mouse + cmd+c forwarded into tmux)?
@@ -127,7 +127,14 @@ Plans:
 
 **Reference:** `.planning/phases/06-text-selection/06-HUMAN-UAT.md` "Forward-Looking Notes" section.
 
-**Plans**: TBD (run `/gsd-plan-phase 7` to break down)
+**Plans:** 6 plans
+Plans:
+- [ ] 07-01-PLAN.md — Wave 1: SGR encoder pure fn + Wave-0 test scaffolding (TM-ENC-01..06)
+- [ ] 07-02-PLAN.md — Wave 1: tmux.conf 3-line override (y/Enter/Escape) + save_buffer_to_pbcopy + cancel_copy_mode + PtySession atomic flags
+- [ ] 07-03-PLAN.md — Wave 1: App helpers (active_session_delegates_to_tmux, active_tmux_session_name, tmux_in_copy_mode_*, tmux_drag_seen_*) + set_active_tab D-16 cancel-outgoing
+- [ ] 07-04-PLAN.md — Wave 2: handle_mouse conditional intercept (delegate→forward SGR; else→Phase 6 overlay) + TM-DISPATCH-01..04 tests
+- [ ] 07-05-PLAN.md — Wave 3: handle_key cmd+c 3-tier precedence + Esc 3-tier precedence + TM-CMDC/ESC/CANCEL tests
+- [ ] 07-06-PLAN.md — Wave 4: dual-path operator UAT (UAT-7-A..K) + PHASE-SUMMARY.md
 
 ## Progress
 
@@ -142,7 +149,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Navigation Fluidity | 0/TBD | Not started | - |
 | 5. Background Work Decoupling | 0/4 | Not started | - |
 | 6. Text Selection | 6/6 | Complete | 2026-04-25 |
-| 7. tmux-native main-screen selection | 0/TBD | Not started | - |
+| 7. tmux-native main-screen selection | 0/6 | Not started | - |
 
 ## Backlog
 
