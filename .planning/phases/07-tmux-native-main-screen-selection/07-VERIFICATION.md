@@ -1,17 +1,27 @@
 ---
 phase: 07-tmux-native-main-screen-selection
 verified: 2026-04-25T00:00:00Z
-status: passed
-score: 24/24 must-haves verified
+status: gaps_found
+score: 24/25 must-haves verified (24 structural + 1 visual-fidelity gap reported post-sign-off)
 overrides_applied: 0
+gaps:
+  - id: GAP-7-01
+    severity: blocking
+    title: Selection visually highlights "the entire screen" instead of mirroring native tmux selection bounds
+    source: operator screenshot comparison post sign-off (2026-04-25)
+    paths_affected: [src/events.rs (handle_mouse intercept @ 87-136), src/app.rs (active_session_delegates_to_tmux @ 554-565)]
+    hypothesis_a_overlay_in_mouse_app: "Operator may have been inside a TUI that sets DECSET 1000/1002/1003 (e.g., opencode). Then `active_session_delegates_to_tmux()` returns false, the Phase 6 overlay path runs, and the visual mismatch is the pre-existing overlay rendering — not a Phase 7 regression. Resolution: confirm scenario, document as expected behavior in UAT-7-G/H, OR widen overlay heuristics."
+    hypothesis_b_delegate_coord_inflation: "Operator was in bash/zsh (delegate path engaged) but the SGR bytes encode coords that tmux interprets as a near-full-pane selection. Possible causes: (1) `local_col`/`local_row` not clamped to `inner.width-1`/`inner.height-1` so out-of-rect events leak inflated coords; (2) wrapped tmux pane size differs from Martins inner rect, so cell mapping is off-by-N; (3) opencode-style TUI fast-toggling between mouse-mode and non-mouse-mode mid-gesture (REVIEW WR-02)."
+    repro_pending: "Operator to test in bash/zsh tab with `cat /usr/share/dict/words | head -30` to disambiguate."
 ---
 
 # Phase 7: tmux-native main-screen selection — Verification Report
 
 **Phase Goal:** Migrate PTY-pane selection from Martins' REVERSED-XOR overlay to the underlying tmux session's native copy-mode, so selection feels indistinguishable from running tmux directly. Mouse-app sessions (vim mouse=a, htop, btop) retain the Phase 6 overlay path.
-**Verified:** 2026-04-25
-**Status:** passed
-**Re-verification:** No — initial verification
+**Verified:** 2026-04-25 (initial structural verification PASSED; visual-fidelity regression reported post-sign-off — see GAP-7-01)
+**Status:** gaps_found
+**Re-verification:** No — initial verification with post-sign-off regression report
+**Operator UAT note:** "Approved" was typed via the resume-signal contract without per-row pass/fail walkthrough; subsequent dual-pane comparison surfaced a visual-fidelity gap that the structural tests cannot detect. Headline goal "feels indistinguishable from Ghostty+tmux direct" is NOT achieved as of 2026-04-25.
 
 ---
 

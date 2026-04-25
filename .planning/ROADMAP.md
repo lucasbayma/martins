@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Navigation Fluidity** - Sidebar, workspace, and tab switching all respond instantly with no stutter on keyboard or mouse
 - [x] **Phase 5: Background Work Decoupling** - Diff refresh, file watcher, and state save never block the event loop or cause random lag spikes
 - [x] **Phase 6: Text Selection** - Drag-select + `cmd+c` copy in the PTY pane, Ghostty-style, with a highlight that survives streaming output (2026-04-25)
-- [x] **Phase 7: tmux-native main-screen selection** - Migrate PTY-pane selection from Martins' REVERSED-XOR overlay to the underlying tmux session's native copy-mode, so selection feels indistinguishable from running tmux directly (2026-04-25)
+- [ ] **Phase 7: tmux-native main-screen selection** - Migrate PTY-pane selection from Martins' REVERSED-XOR overlay to the underlying tmux session's native copy-mode, so selection feels indistinguishable from running tmux directly (REOPENED 2026-04-25 — visual-fidelity gap; see GAP-7-01)
 
 ## Phase Details
 
