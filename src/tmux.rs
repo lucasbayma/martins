@@ -193,4 +193,30 @@ mod tests {
     fn nonexistent_session() {
         assert!(!session_exists("martins-nonexistent-test-session"));
     }
+
+    #[test]
+    fn ensure_config_writes_phase7_bindings() {
+        // TM-CONF-01: ensure_config must include the 3 Phase-7 override bindings.
+        // Tmux 3.6a defaults handle MouseDragEnd1Pane / DoubleClick1Pane / TripleClick1Pane —
+        // we only override (a) y/Enter to pipe to system pbcopy and (b) Escape to cancel.
+        let path = ensure_config();
+        let conf = std::fs::read_to_string(&path).expect("read tmux.conf");
+        assert!(
+            conf.contains("bind-key -T copy-mode-vi y     send-keys -X copy-pipe-and-cancel \"pbcopy\""),
+            "missing y to pbcopy binding\n\nactual:\n{conf}"
+        );
+        assert!(
+            conf.contains("bind-key -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel \"pbcopy\""),
+            "missing Enter to pbcopy binding\n\nactual:\n{conf}"
+        );
+        assert!(
+            conf.contains("bind-key -T copy-mode-vi Escape send-keys -X cancel"),
+            "missing Escape to cancel override (CRITICAL - vi-mode default is clear-selection)\n\nactual:\n{conf}"
+        );
+        // Negative assertion: confirm we did NOT re-bind tmux 3.6a defaults.
+        assert!(
+            !conf.contains("MouseDragEnd1Pane"),
+            "MouseDragEnd1Pane is a tmux 3.6a default - re-binding is dead config (RESEARCH §Tmux Defaults)"
+        );
+    }
 }
