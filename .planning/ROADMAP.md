@@ -129,9 +129,9 @@ Plans:
 
 **Plans:** 6 plans
 Plans:
-- [ ] 07-01-PLAN.md — Wave 1: SGR encoder pure fn + Wave-0 test scaffolding (TM-ENC-01..06)
-- [ ] 07-02-PLAN.md — Wave 1: tmux.conf 3-line override (y/Enter/Escape) + save_buffer_to_pbcopy + cancel_copy_mode + PtySession atomic flags
-- [ ] 07-03-PLAN.md — Wave 1: App helpers (active_session_delegates_to_tmux, active_tmux_session_name, tmux_in_copy_mode_*, tmux_drag_seen_*) + set_active_tab D-16 cancel-outgoing
+- [x] 07-01-PLAN.md — Wave 1: SGR encoder pure fn + Wave-0 test scaffolding (TM-ENC-01..06)
+- [x] 07-02-PLAN.md — Wave 1: tmux.conf 3-line override (y/Enter/Escape) + save_buffer_to_pbcopy + cancel_copy_mode + PtySession atomic flags
+- [x] 07-03-PLAN.md — Wave 1: App helpers (active_session_delegates_to_tmux, active_tmux_session_name, tmux_in_copy_mode_*, tmux_drag_seen_*) + set_active_tab D-16 cancel-outgoing
 - [ ] 07-04-PLAN.md — Wave 2: handle_mouse conditional intercept (delegate→forward SGR; else→Phase 6 overlay) + TM-DISPATCH-01..04 tests
 - [ ] 07-05-PLAN.md — Wave 3: handle_key cmd+c 3-tier precedence + Esc 3-tier precedence + TM-CMDC/ESC/CANCEL tests
 - [ ] 07-06-PLAN.md — Wave 4: dual-path operator UAT (UAT-7-A..K) + PHASE-SUMMARY.md
