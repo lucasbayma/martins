@@ -167,6 +167,26 @@ pub fn render(
                 .unwrap_or(0);
             let sr_translated = (sr_raw as i64) - (start_delta as i64);
             let er_translated = (er_raw as i64) - (end_delta as i64);
+            // GAP-7-01 instrumentation: env-var gated selection-render tracing for
+            // hypothesis E (scroll-generation false-positive inflates overlay translation).
+            // Set MARTINS_MOUSE_DEBUG=1 to log per-frame selection geometry.
+            if std::env::var_os("MARTINS_MOUSE_DEBUG").is_some() {
+                eprintln!(
+                    "[sel-render] raw=({},{})->({},{}) gens=start{}/end{:?}/curr{} \
+                     deltas=({},{}) translated={}->{}",
+                    sc_raw,
+                    sr_raw,
+                    ec_raw,
+                    er_raw,
+                    sel.start_gen,
+                    sel.end_gen,
+                    current_gen,
+                    start_delta,
+                    end_delta,
+                    sr_translated,
+                    er_translated
+                );
+            }
             // D-08: if entire selection has scrolled off (end row above top),
             // render nothing — but SelectionState stays in app state.
             if er_translated >= 0 {

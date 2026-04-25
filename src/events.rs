@@ -76,6 +76,31 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
         rect_contains(inner, mouse.column, mouse.row)
     });
 
+    // GAP-7-01 instrumentation: env-var gated mouse-event tracing for hypothesis D
+    // (drag-exits-inner-rect-drops-events). Set MARTINS_MOUSE_DEBUG=1 and run with
+    // 2>/tmp/martins-debug.log. Each forwarded/dropped event logs (kind, raw col/row,
+    // inner rect, in_terminal flag, delegate decision). Cheap when unset.
+    if std::env::var_os("MARTINS_MOUSE_DEBUG").is_some() {
+        let inner = app
+            .last_panes
+            .as_ref()
+            .map(|p| terminal_content_rect(p.terminal))
+            .unwrap_or(Rect::default());
+        let delegate = app.active_session_delegates_to_tmux();
+        eprintln!(
+            "[mouse] kind={:?} raw=({},{}) inner=({},{},{}x{}) in_term={} delegate={}",
+            mouse.kind,
+            mouse.column,
+            mouse.row,
+            inner.x,
+            inner.y,
+            inner.width,
+            inner.height,
+            in_terminal,
+            delegate
+        );
+    }
+
     // Phase 7 (D-07/D-08): conditional intercept of Left-button events when
     // the inner program has not requested mouse mode AND we're not on alternate
     // screen. Forward as raw SGR (1006) bytes into the wrapped tmux PTY, which
