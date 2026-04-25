@@ -126,4 +126,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. PTY Input Fluidity | 1/1 | Complete | 2026-04-24 |
 | 4. Navigation Fluidity | 0/TBD | Not started | - |
 | 5. Background Work Decoupling | 0/4 | Not started | - |
-| 6. Text Selection | 3/6 | In progress | - |
+| 6. Text Selection | 4/6 | In progress | - |

@@ -29,8 +29,10 @@ Requirements for the fluidity milestone. Each maps to exactly one roadmap phase.
 <!-- Ghostty-style drag-select + cmd+c copy in the main PTY pane. -->
 
 - [ ] **SEL-01**: Mouse drag on the PTY main pane starts a text selection with a visible highlight that tracks the cursor with no lag
-- [ ] **SEL-02**: `cmd+c` while a selection is active copies the selected text to the macOS clipboard via `pbcopy`
-- [ ] **SEL-03**: Click (or Escape) outside the selection clears the highlight immediately
+- [x] **SEL-02
+**: `cmd+c` while a selection is active copies the selected text to the macOS clipboard via `pbcopy`
+- [x] **SEL-03
+**: Click (or Escape) outside the selection clears the highlight immediately
 - [x] **SEL-04
 **: Selection highlight does not flicker or disappear when the underlying PTY buffer receives new output — the selection stays stable until the user clears it
 

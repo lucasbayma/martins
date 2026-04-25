@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-03-PLAN.md
-last_updated: "2026-04-25T11:05:20.068Z"
+stopped_at: Completed 06-04-PLAN.md
+last_updated: "2026-04-25T11:11:00.000Z"
 last_activity: 2026-04-25
 progress:
   total_phases: 6
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-23)
 ## Current Position
 
 Phase: 06 (text-selection) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-04-25
 
@@ -67,6 +67,7 @@ Progress: [██████████] 100%
 | Phase 05 P03 | 5m | 3 tasks | 4 files |
 | Phase 06 P06-02 | 8m | 2 tasks | 2 files |
 | Phase 06 P06-03 | 12m | 2 tasks | 3 files |
+| Phase 06 P06-04 | 4m | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,7 @@ Recent decisions affecting current work:
 - Phase 05-03: 13 hot-path save_state() sites migrated to save_state_spawn() (events.rs=4, workspace.rs=7, modal_controller.rs=2); archive_active_workspace + delete_archived_workspace remove_dir_all calls wrapped in tokio::task::spawn_blocking (Rule 2 — both bare calls had identical blocking concern; net: 0 bare remove_dir_all in workspace.rs); #[allow(dead_code)] removed from save_state_spawn; graceful-exit drain at src/app.rs:264 preserved (Pitfall #5)
 - Phase 06-02: PtySession.scroll_generation Arc<AtomicU64> field added; PTY reader thread wraps parser.process with SCROLLBACK-LEN heuristic (cursor-at-bottom AND top-row-hash-changed); row_hash free function over screen.cell.contents; Ordering::Relaxed sufficient (T-06-04); test renamed gen→gen_count for Rust 2024
 - Phase 06-03: handle_mouse Drag/Up/Down extended to anchor SelectionState at session.scroll_generation, snapshot text on Up via materialize_selection_text, dispatch double/triple/shift-click; 5 new App helpers (materialize_selection_text, active_scroll_generation, select_word_at, select_line_at, extend_selection_to) + private word_boundary_at; compute-read-only-first / then-&mut-borrow pattern resolves borrow-checker conflicts between &self readers and &mut self.selection writes; click counter resets on outside-terminal clicks (Rule 2 missing-functionality auto-fix); 13 selection tests + 122 full suite green
+- Phase 06-04: handle_key gains 2 precedence branches between modal-handling and Terminal-mode forwarding — cmd+c (SUPER+c) calls copy_selection_to_clipboard if non-empty selection (D-04 keep-after-copy), else writes 0x03 SIGINT in Terminal mode (D-03), else falls through; Esc with NONE modifier and active selection clears selection + mark_dirty + return (D-14, D-23). main.rs init pushes KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES (RESEARCH §Q5 OQ-1) so SUPER is delivered on kitty-protocol terminals; restore pops it FIRST in the execute! sequence (T-06-07). 2 new key-path tests + 2 Manual-Only UAT entries (UAT-06-04-A/B) for byte-level PTY forwarding paths that automation rejected (CLAUDE.md minimal-surface — no PtyWriteLog test seam). src/app.rs UNTOUCHED. 124 full suite green.
 
 ### Pending Todos
 
@@ -117,10 +119,10 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-25T11:30:00.000Z
-Stopped at: Completed 06-03-PLAN.md
+Last session: 2026-04-25T11:11:00.000Z
+Stopped at: Completed 06-04-PLAN.md
 Resume file: None
-Next: Phase 6 Plan 04 (Wave 2) — cmd+c key handling: route SUPER+c to copy_selection_to_clipboard when selection active, else send 0x03 SIGINT in Terminal mode
+Next: Phase 6 Plan 05 (Wave 3) — render-path selection translation: anchored (gen, row, col) → current screen rows via PtySession.scroll_generation, with off-screen clipping (D-08)
 
 **Completed Phase:** 3 (PTY Input Fluidity) — 1 of 1 plan executed (03-02 skipped per UAT) — 2026-04-24
 
