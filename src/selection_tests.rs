@@ -901,3 +901,197 @@ async fn workspace_switch_clears_selection() {
         "D-23: select_active_workspace clearing must mark_dirty"
     );
 }
+
+// ========================================================================
+// 06-05: Render-level selection-highlight tests
+// ========================================================================
+//
+// These tests drive `crate::ui::terminal::render_with_selection_for_test`
+// (a #[cfg(test)] shim that mirrors the production highlight pass) over a
+// `ratatui::backend::TestBackend` and assert the post-render Buffer state.
+//
+// Asserts:
+//   - D-20 + D-21: `Modifier::REVERSED` is XOR-toggled per highlighted cell.
+//   - D-08: when the anchored row has scrolled off above the visible area,
+//     the highlight is clipped at row 0.
+
+/// SEL-01 / D-20 + D-21 — every cell in the selection range gets
+/// `Modifier::REVERSED` toggled on (from a baseline of no modifier).
+#[test]
+fn selection_highlights_cells_with_reversed_modifier() {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+    use ratatui::style::Modifier;
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let sel = SelectionState {
+        start_col: 5,
+        start_row: 3,
+        start_gen: 0,
+        end_col: 10,
+        end_row: 3,
+        end_gen: Some(0),
+        dragging: false,
+        text: None,
+    };
+    let current_gen: u64 = 0;
+    terminal
+        .draw(|frame| {
+            crate::ui::terminal::render_with_selection_for_test(
+                frame,
+                Rect {
+                    x: 0,
+                    y: 0,
+                    width: 80,
+                    height: 24,
+                },
+                Some(&sel),
+                current_gen,
+            );
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    for col in 5..=10u16 {
+        let cell = buf.cell((col, 3u16)).expect("cell in-bounds");
+        assert!(
+            cell.modifier.contains(Modifier::REVERSED),
+            "cell ({col}, 3) should have REVERSED toggled on"
+        );
+    }
+    let outside = buf.cell((0u16, 3u16)).expect("cell in-bounds");
+    assert!(
+        !outside.modifier.contains(Modifier::REVERSED),
+        "cell (0, 3) outside selection should NOT have REVERSED"
+    );
+}
+
+/// D-21 — when an underlying cell already has `Modifier::REVERSED` (e.g.
+/// from a vt100 reverse-video escape), XOR-toggling under the selection
+/// REMOVES the flag, making the highlight visually distinct from
+/// surrounding reversed cells.
+#[test]
+fn already_reversed_cell_un_reverses_under_selection() {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+    use ratatui::style::Modifier;
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let sel = SelectionState {
+        start_col: 7,
+        start_row: 2,
+        start_gen: 0,
+        end_col: 9,
+        end_row: 2,
+        end_gen: Some(0),
+        dragging: false,
+        text: None,
+    };
+    let current_gen: u64 = 0;
+    terminal
+        .draw(|frame| {
+            // Pre-populate the target cells with REVERSED already set,
+            // simulating a vt100 reverse-video output that landed in the
+            // buffer before the selection-highlight pass runs.
+            {
+                let buf = frame.buffer_mut();
+                for col in 7..=9u16 {
+                    if let Some(cell) = buf.cell_mut((col, 2u16)) {
+                        cell.modifier.insert(Modifier::REVERSED);
+                    }
+                }
+            }
+            crate::ui::terminal::render_with_selection_for_test(
+                frame,
+                Rect {
+                    x: 0,
+                    y: 0,
+                    width: 80,
+                    height: 24,
+                },
+                Some(&sel),
+                current_gen,
+            );
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+    for col in 7..=9u16 {
+        let cell = buf.cell((col, 2u16)).expect("cell in-bounds");
+        assert!(
+            !cell.modifier.contains(Modifier::REVERSED),
+            "cell ({col}, 2) was REVERSED before render — XOR should have removed it"
+        );
+    }
+}
+
+/// SEL-04 / D-08 — selection anchored at gen=0 viewed under current_gen=3
+/// has its rows translated by delta=3. start_row=2 → -1 (clipped to row 0);
+/// end_row=5 → row 2. Cells in rows 0..=2 of the column span are REVERSED;
+/// rows 3+ have no REVERSED.
+#[test]
+fn selection_clips_at_visible_top_when_scrolled() {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+    use ratatui::style::Modifier;
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    // Selection spans visible rows 2..=5 at the moment of capture
+    // (sel_gen = 0). After 3 lines of new output have scrolled the
+    // screen (current_gen = 3), the translated rows are -1..=2, which
+    // clips at row 0 and ends at row 2.
+    let sel = SelectionState {
+        start_col: 4,
+        start_row: 2,
+        start_gen: 0,
+        end_col: 12,
+        end_row: 5,
+        end_gen: Some(0),
+        dragging: false,
+        text: None,
+    };
+    let current_gen: u64 = 3;
+    terminal
+        .draw(|frame| {
+            crate::ui::terminal::render_with_selection_for_test(
+                frame,
+                Rect {
+                    x: 0,
+                    y: 0,
+                    width: 80,
+                    height: 24,
+                },
+                Some(&sel),
+                current_gen,
+            );
+        })
+        .unwrap();
+    let buf = terminal.backend().buffer();
+
+    // Rows 0..=2 of the selection's column span must be REVERSED.
+    // Row 0 is the clipped start (start_col=0 because translated < 0).
+    // Rows 1..=1 are intermediate, full-width up to inner.width-1.
+    // Row 2 is the (clipped) end, columns 0..=12.
+    for row in 0..=2u16 {
+        let cell = buf.cell((4u16, row)).expect("cell in-bounds");
+        assert!(
+            cell.modifier.contains(Modifier::REVERSED),
+            "row {row}, col 4 should be inside the clipped selection (REVERSED)"
+        );
+    }
+    let cell_end = buf.cell((12u16, 2u16)).expect("cell in-bounds");
+    assert!(
+        cell_end.modifier.contains(Modifier::REVERSED),
+        "(12, 2) is the translated end-cell — should be REVERSED"
+    );
+
+    // Rows 3+ must NOT have REVERSED — selection ends at translated row 2.
+    for row in 3..=5u16 {
+        let cell = buf.cell((4u16, row)).expect("cell in-bounds");
+        assert!(
+            !cell.modifier.contains(Modifier::REVERSED),
+            "row {row}, col 4 is below the clipped selection — must NOT be REVERSED"
+        );
+    }
+}
