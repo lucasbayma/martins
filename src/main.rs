@@ -23,6 +23,9 @@ mod pty_input_tests;
 #[cfg(test)]
 mod navigation_tests;
 
+#[cfg(test)]
+mod selection_tests;
+
 use anyhow::Result;
 use clap::Parser;
 use crossterm::{event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture}, execute};
