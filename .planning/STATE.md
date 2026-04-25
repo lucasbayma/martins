@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
+status: executing
 stopped_at: Phase 7 context gathered
-last_updated: "2026-04-25T13:02:19.697Z"
-last_activity: 2026-04-25
+last_updated: "2026-04-25T14:17:56.183Z"
+last_activity: 2026-04-25 -- Phase 07 execution started
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 22
+  total_plans: 28
   completed_plans: 25
-  percent: 100
+  percent: 89
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Input-to-pixel responsiveness must feel like a native GPU-accelerated terminal (Ghostty/Alacritty baseline).
-**Current focus:** Phase 06 — text-selection
+**Current focus:** Phase 07 — tmux-native-main-screen-selection
 
 ## Current Position
 
-Phase: 06
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-04-25
+Phase: 07 (tmux-native-main-screen-selection) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 07
+Last activity: 2026-04-25 -- Phase 07 execution started
 
 Progress: [██████████] 100%
 
@@ -131,4 +131,4 @@ Next: Phase 6 Plan 05 (Wave 3) — render-path selection translation: anchored (
 
 **Completed Phase:** 3 (PTY Input Fluidity) — 1 of 1 plan executed (03-02 skipped per UAT) — 2026-04-24
 
-**Planned Phase:** 06 (text-selection) — 6 plans — 2026-04-25T01:42:07.741Z
+**Planned Phase:** 7 (tmux-native main-screen selection) — 6 plans — 2026-04-25T14:01:45.932Z
