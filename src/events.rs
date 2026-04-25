@@ -54,9 +54,12 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                     app.selection = Some(SelectionState {
                         start_col: col,
                         start_row: row,
+                        start_gen: 0,
                         end_col: col,
                         end_row: row,
+                        end_gen: None,
                         dragging: true,
+                        text: None,
                     });
                 }
                 return;
@@ -79,6 +82,20 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
             if app.selection.is_some() {
                 app.selection = None;
             }
+            // D-16: maintain a 300ms click cluster counter. Reset to 1 if
+            // the click lands at a different row OR exceeds the threshold.
+            let now = std::time::Instant::now();
+            let within_threshold = app
+                .last_click_at
+                .is_some_and(|t| now.duration_since(t) < std::time::Duration::from_millis(300));
+            if within_threshold && mouse.row == app.last_click_row {
+                app.last_click_count = app.last_click_count.saturating_add(1);
+            } else {
+                app.last_click_count = 1;
+            }
+            app.last_click_at = Some(now);
+            app.last_click_row = mouse.row;
+            app.last_click_col = mouse.column;
             handle_click(app, mouse.column, mouse.row).await;
         }
         MouseEventKind::ScrollUp => handle_scroll(app, mouse.column, mouse.row, -1),

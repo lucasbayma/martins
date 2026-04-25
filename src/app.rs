@@ -25,13 +25,28 @@ pub enum SidebarItem {
     ArchivedWorkspace(usize, usize),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectionState {
     pub start_col: u16,
     pub start_row: u16,
+    /// Anchored scroll generation at drag-start (D-06). Lives on PtySession
+    /// (Plan 02) — captured here at mouse-down so the highlight stays
+    /// pinned to text content even as new PTY output scrolls the screen.
+    pub start_gen: u64,
     pub end_col: u16,
     pub end_row: u16,
+    /// `None` while the user is mid-drag (end is cursor-relative); `Some`
+    /// once the user releases the button (D-07). Anchoring the end after
+    /// mouse-up means subsequent scroll events translate both endpoints.
+    pub end_gen: Option<u64>,
     pub dragging: bool,
+    /// Snapshot of the selected text captured at mouse-up so cmd+c can
+    /// re-copy the same content even after the originally-selected rows
+    /// have scrolled off the visible area (RESEARCH §Q2). vt100's
+    /// `contents_between` only iterates visible rows, so without this
+    /// snapshot a post-scroll-off cmd+c would yield only the surviving
+    /// portion.
+    pub text: Option<String>,
 }
 
 impl SelectionState {
@@ -76,6 +91,15 @@ pub struct App {
     pub state_path: PathBuf,
     pub last_pty_size: (u16, u16),
     pub selection: Option<SelectionState>,
+    /// Multi-click cluster tracking for double/triple-click detection (D-16).
+    /// `last_click_at` captures the timestamp of the most recent
+    /// `MouseEventKind::Down(Left)`; if the next click lands within 300ms
+    /// at the same row/col, `last_click_count` increments. Otherwise the
+    /// counter resets to 1.
+    pub last_click_at: Option<std::time::Instant>,
+    pub last_click_count: u8,
+    pub last_click_row: u16,
+    pub last_click_col: u16,
     pub last_frame_area: Rect,
     pub pending_workspace: Option<Option<String>>,
     pub archived_expanded: std::collections::HashSet<String>,
@@ -143,6 +167,10 @@ impl App {
             state_path,
             last_pty_size: (24, 80),
             selection: None,
+            last_click_at: None,
+            last_click_count: 0,
+            last_click_row: 0,
+            last_click_col: 0,
             last_frame_area: Rect::default(),
             pending_workspace: None,
             archived_expanded: std::collections::HashSet::new(),
@@ -170,6 +198,25 @@ impl App {
     #[inline]
     pub(crate) fn mark_dirty(&mut self) {
         self.dirty = true;
+    }
+
+    /// Clear any active text selection and mark the frame dirty IFF a
+    /// selection actually existed (D-22, D-23). Called at every tab/
+    /// workspace switch site by downstream Plan 06; centralized here so
+    /// callers stay one-liners and the dirty-flag discipline is uniform.
+    ///
+    /// Avoids spurious redraws via the `take().is_some()` guard — if the
+    /// user has no active selection, calling this is a no-op.
+    ///
+    /// `#[allow(dead_code)]` until Plan 06-06 wires the call sites at every
+    /// tab/workspace switch. Mirrors the `save_state_spawn` precedent
+    /// (Plan 05-02 → 05-03).
+    #[inline]
+    #[allow(dead_code)]
+    pub(crate) fn clear_selection(&mut self) {
+        if self.selection.take().is_some() {
+            self.mark_dirty();
+        }
     }
 
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
