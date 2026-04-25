@@ -17,6 +17,41 @@ use crossterm::event::{
 use ratatui::layout::Rect;
 use ratatui::widgets::ListState;
 
+/// Encode a crossterm MouseEvent into an SGR (1006) byte sequence for
+/// forwarding into the wrapped tmux PTY. Coords are inner-pane-relative AND
+/// 1-based per xterm convention. Returns None for events that should not be
+/// forwarded (Moved without button, ScrollLeft/ScrollRight, non-Left buttons,
+/// and any other variant out of Phase 7 scope per CONTEXT.md D-04 / Deferred).
+///
+/// Per 07-RESEARCH.md §SGR Mouse Encoding: button bits {0=left} | motion(32) for Drag,
+/// modifier bits {SHIFT=4, ALT=8, CONTROL=16}, trailing byte 'M' for press/motion and
+/// 'm' for release.
+///
+/// Mirrors the existing inline encodes at events.rs:195 (scroll wheel) and
+/// events.rs:256 (sidebar click forward) — single source of truth for SGR.
+pub(crate) fn encode_sgr_mouse(
+    kind: MouseEventKind,
+    modifiers: KeyModifiers,
+    local_col: u16,
+    local_row: u16,
+) -> Option<Vec<u8>> {
+    let (button_base, trailing) = match kind {
+        MouseEventKind::Down(MouseButton::Left)  => (0u8, 'M'),
+        MouseEventKind::Drag(MouseButton::Left)  => (32u8, 'M'),
+        MouseEventKind::Up(MouseButton::Left)    => (0u8, 'm'),
+        MouseEventKind::ScrollUp                 => (64u8, 'M'),
+        MouseEventKind::ScrollDown               => (65u8, 'M'),
+        _ => return None,
+    };
+    let mut cb = button_base;
+    if modifiers.contains(KeyModifiers::SHIFT)   { cb += 4; }
+    if modifiers.contains(KeyModifiers::ALT)     { cb += 8; }
+    if modifiers.contains(KeyModifiers::CONTROL) { cb += 16; }
+    let col = local_col + 1;
+    let row = local_row + 1;
+    Some(format!("\x1b[<{cb};{col};{row}{trailing}").into_bytes())
+}
+
 pub async fn handle_event(app: &mut App, event: Event) {
     match event {
         Event::Key(key) if key.kind == KeyEventKind::Press => handle_key(app, key).await,
