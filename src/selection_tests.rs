@@ -277,8 +277,12 @@ async fn scroll_generation_increments_on_vertical_scroll() {
         session.write_input(line.as_bytes()).expect("write_input");
     }
 
-    // Poll for up to 500ms for the reader thread to drain.
-    let deadline = Instant::now() + Duration::from_millis(500);
+    // Poll for up to 2000ms for the reader thread to drain. Matches the
+    // budget used by `write_and_wait_for_text` (file:48). 500ms was tight
+    // on cold/parallel CI runs where PTY reader-thread scheduling latency
+    // + cat's stdin echo + vt100 parse can plausibly exceed it on the
+    // first scroll-detection (REVIEW-MINOR-04).
+    let deadline = Instant::now() + Duration::from_millis(2000);
     let mut gen_count = 0u64;
     while Instant::now() < deadline {
         gen_count = session.scroll_generation.load(Ordering::Relaxed);
