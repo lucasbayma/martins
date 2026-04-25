@@ -22,7 +22,7 @@ use crate::ui::theme;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
 };
@@ -207,10 +207,18 @@ pub fn render(
                             break;
                         }
                         if let Some(cell) = buf.cell_mut((inner.x + col, inner.y + row)) {
-                            // D-20 + D-21: XOR REVERSED — already-reversed cells
-                            // un-reverse, making the highlight visually distinct
-                            // from surrounding vt100 reverse-video.
-                            cell.modifier.toggle(Modifier::REVERSED);
+                            // GAP-7-01 fix: match tmux's default `mode-style`
+                            // (fg=black, bg=yellow). Operator wants selection feel
+                            // indistinguishable from running tmux directly in
+                            // Ghostty. Apply explicit style instead of XOR-toggling
+                            // REVERSED so the highlight is uniform regardless of
+                            // underlying cell state (status bars, already-reversed
+                            // text, syntax-highlighted regions all render as the
+                            // same yellow block). Clear pre-existing REVERSED first
+                            // so the new fg/bg pair shows through cleanly.
+                            cell.modifier.remove(Modifier::REVERSED);
+                            cell.fg = Color::Black;
+                            cell.bg = Color::Yellow;
                         }
                     }
                 }
@@ -265,7 +273,11 @@ pub(crate) fn render_with_selection_for_test(
                 break;
             }
             if let Some(cell) = buf.cell_mut((inner.x + col, inner.y + row)) {
-                cell.modifier.toggle(Modifier::REVERSED);
+                // Mirror production behavior: GAP-7-01 fix replaced XOR-REVERSED
+                // with tmux's default mode-style (fg=black, bg=yellow).
+                cell.modifier.remove(Modifier::REVERSED);
+                cell.fg = Color::Black;
+                cell.bg = Color::Yellow;
             }
         }
     }

@@ -947,17 +947,20 @@ async fn workspace_switch_clears_selection() {
 // `ratatui::backend::TestBackend` and assert the post-render Buffer state.
 //
 // Asserts:
-//   - D-20 + D-21: `Modifier::REVERSED` is XOR-toggled per highlighted cell.
+//   - GAP-7-01 (Phase 7 fix): each highlighted cell receives the tmux
+//     mode-style (fg=Black, bg=Yellow); pre-existing REVERSED is cleared.
+//     This replaces the prior D-20/D-21 XOR-REVERSED behavior so Martins'
+//     overlay selection feels indistinguishable from native tmux selection.
 //   - D-08: when the anchored row has scrolled off above the visible area,
 //     the highlight is clipped at row 0.
 
-/// SEL-01 / D-20 + D-21 — every cell in the selection range gets
-/// `Modifier::REVERSED` toggled on (from a baseline of no modifier).
+/// SEL-01 / GAP-7-01 — every cell in the selection range gets the tmux
+/// mode-style applied (fg=Black, bg=Yellow).
 #[test]
-fn selection_highlights_cells_with_reversed_modifier() {
+fn selection_highlights_cells_with_tmux_mode_style() {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
-    use ratatui::style::Modifier;
+    use ratatui::style::{Color, Modifier};
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -990,27 +993,38 @@ fn selection_highlights_cells_with_reversed_modifier() {
     let buf = terminal.backend().buffer();
     for col in 5..=10u16 {
         let cell = buf.cell((col, 3u16)).expect("cell in-bounds");
+        assert_eq!(
+            cell.bg,
+            Color::Yellow,
+            "cell ({col}, 3) should have Yellow background (tmux mode-style)"
+        );
+        assert_eq!(
+            cell.fg,
+            Color::Black,
+            "cell ({col}, 3) should have Black foreground (tmux mode-style)"
+        );
         assert!(
-            cell.modifier.contains(Modifier::REVERSED),
-            "cell ({col}, 3) should have REVERSED toggled on"
+            !cell.modifier.contains(Modifier::REVERSED),
+            "cell ({col}, 3) should NOT have REVERSED (XOR-toggle replaced by explicit style)"
         );
     }
     let outside = buf.cell((0u16, 3u16)).expect("cell in-bounds");
-    assert!(
-        !outside.modifier.contains(Modifier::REVERSED),
-        "cell (0, 3) outside selection should NOT have REVERSED"
+    assert_ne!(
+        outside.bg,
+        Color::Yellow,
+        "cell (0, 3) outside selection should NOT carry the selection bg"
     );
 }
 
-/// D-21 — when an underlying cell already has `Modifier::REVERSED` (e.g.
-/// from a vt100 reverse-video escape), XOR-toggling under the selection
-/// REMOVES the flag, making the highlight visually distinct from
-/// surrounding reversed cells.
+/// GAP-7-01 — when an underlying cell already has `Modifier::REVERSED`
+/// (e.g. from a vt100 reverse-video escape such as a status bar), the
+/// selection pass clears REVERSED and applies the tmux mode-style on top
+/// so the highlight is uniform regardless of underlying cell state.
 #[test]
-fn already_reversed_cell_un_reverses_under_selection() {
+fn already_reversed_cell_clears_reverse_under_selection() {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
-    use ratatui::style::Modifier;
+    use ratatui::style::{Color, Modifier};
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -1056,20 +1070,30 @@ fn already_reversed_cell_un_reverses_under_selection() {
         let cell = buf.cell((col, 2u16)).expect("cell in-bounds");
         assert!(
             !cell.modifier.contains(Modifier::REVERSED),
-            "cell ({col}, 2) was REVERSED before render — XOR should have removed it"
+            "cell ({col}, 2) was REVERSED before render — selection pass should clear it"
+        );
+        assert_eq!(
+            cell.bg,
+            Color::Yellow,
+            "cell ({col}, 2) should carry the tmux mode-style yellow bg"
+        );
+        assert_eq!(
+            cell.fg,
+            Color::Black,
+            "cell ({col}, 2) should carry the tmux mode-style black fg"
         );
     }
 }
 
 /// SEL-04 / D-08 — selection anchored at gen=0 viewed under current_gen=3
 /// has its rows translated by delta=3. start_row=2 → -1 (clipped to row 0);
-/// end_row=5 → row 2. Cells in rows 0..=2 of the column span are REVERSED;
-/// rows 3+ have no REVERSED.
+/// end_row=5 → row 2. Cells in rows 0..=2 of the column span carry the
+/// tmux mode-style bg=Yellow; rows 3+ do not.
 #[test]
 fn selection_clips_at_visible_top_when_scrolled() {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
-    use ratatui::style::Modifier;
+    use ratatui::style::Color;
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -1105,29 +1129,32 @@ fn selection_clips_at_visible_top_when_scrolled() {
         .unwrap();
     let buf = terminal.backend().buffer();
 
-    // Rows 0..=2 of the selection's column span must be REVERSED.
+    // Rows 0..=2 of the selection's column span must carry bg=Yellow.
     // Row 0 is the clipped start (start_col=0 because translated < 0).
     // Rows 1..=1 are intermediate, full-width up to inner.width-1.
     // Row 2 is the (clipped) end, columns 0..=12.
     for row in 0..=2u16 {
         let cell = buf.cell((4u16, row)).expect("cell in-bounds");
-        assert!(
-            cell.modifier.contains(Modifier::REVERSED),
-            "row {row}, col 4 should be inside the clipped selection (REVERSED)"
+        assert_eq!(
+            cell.bg,
+            Color::Yellow,
+            "row {row}, col 4 should be inside the clipped selection (yellow bg)"
         );
     }
     let cell_end = buf.cell((12u16, 2u16)).expect("cell in-bounds");
-    assert!(
-        cell_end.modifier.contains(Modifier::REVERSED),
-        "(12, 2) is the translated end-cell — should be REVERSED"
+    assert_eq!(
+        cell_end.bg,
+        Color::Yellow,
+        "(12, 2) is the translated end-cell — should carry yellow bg"
     );
 
-    // Rows 3+ must NOT have REVERSED — selection ends at translated row 2.
+    // Rows 3+ must NOT have the selection bg — selection ends at translated row 2.
     for row in 3..=5u16 {
         let cell = buf.cell((4u16, row)).expect("cell in-bounds");
-        assert!(
-            !cell.modifier.contains(Modifier::REVERSED),
-            "row {row}, col 4 is below the clipped selection — must NOT be REVERSED"
+        assert_ne!(
+            cell.bg,
+            Color::Yellow,
+            "row {row}, col 4 is below the clipped selection — must NOT carry selection bg"
         );
     }
 }
