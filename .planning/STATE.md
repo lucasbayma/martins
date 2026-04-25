@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 7 context gathered
-last_updated: "2026-04-25T14:17:56.183Z"
-last_activity: 2026-04-25 -- Phase 07 execution started
+stopped_at: Phase 7 completed (operator UAT signed off 2026-04-25)
+last_updated: "2026-04-25T14:50:00.000Z"
+last_activity: 2026-04-25 -- Phase 07 completed (tmux-native main-screen selection — dual-path UAT all PASS)
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 28
-  completed_plans: 25
-  percent: 89
+  completed_plans: 28
+  percent: 100
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-23)
 
 ## Current Position
 
-Phase: 07 (tmux-native-main-screen-selection) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 07
-Last activity: 2026-04-25 -- Phase 07 execution started
+Phase: 07 (tmux-native-main-screen-selection) — COMPLETED 2026-04-25
+Plan: 6 of 6 (all complete)
+Status: Phase 07 closed; operator UAT signed off "approved"
+Last activity: 2026-04-25 -- Phase 07 closed (PHASE-SUMMARY.md written, ROADMAP/REQUIREMENTS updated)
 
 Progress: [██████████] 100%
 
@@ -71,6 +71,12 @@ Progress: [██████████] 100%
 | Phase 06 P06-04 | 4m | 2 tasks | 4 files |
 | Phase 06 P06-06 | 6m | 3 tasks | 4 files |
 | Phase 06 P06-05 | 3m | 2 tasks | 3 files |
+| Phase 07 P07-01 | ~3m | 2 tasks | 3 files |
+| Phase 07 P07-02 | 2m | 2 tasks | 2 files |
+| Phase 07 P07-03 | ~10m | 1 task | 1 file |
+| Phase 07 P07-04 | ~8m | 2 tasks | 3 files |
+| Phase 07 P07-05 | ~3m | 2 tasks | 2 files |
+| Phase 07 P07-06 | ~10m | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -105,6 +111,7 @@ Recent decisions affecting current work:
 - Phase 06-04: handle_key gains 2 precedence branches between modal-handling and Terminal-mode forwarding — cmd+c (SUPER+c) calls copy_selection_to_clipboard if non-empty selection (D-04 keep-after-copy), else writes 0x03 SIGINT in Terminal mode (D-03), else falls through; Esc with NONE modifier and active selection clears selection + mark_dirty + return (D-14, D-23). main.rs init pushes KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES (RESEARCH §Q5 OQ-1) so SUPER is delivered on kitty-protocol terminals; restore pops it FIRST in the execute! sequence (T-06-07). 2 new key-path tests + 2 Manual-Only UAT entries (UAT-06-04-A/B) for byte-level PTY forwarding paths that automation rejected (CLAUDE.md minimal-surface — no PtyWriteLog test seam). src/app.rs UNTOUCHED. 124 full suite green.
 - Phase 06-06: App::set_active_tab(idx) primitive lands at src/app.rs:402 — clears selection, sets active_tab, unconditionally calls mark_dirty (tab-strip repaint). App::select_active_workspace extended with self.clear_selection() as first line of body. #[allow(dead_code)] removed from clear_selection (now has 7 active call sites). 4 set_active_tab migration sites in workspace.rs (switch_project, confirm_remove_project no-active-project arm, create_workspace, create_tab) + 5 in events.rs (TabClick::Close, F-key, CloseTab retarget consolidated to single Option<usize> hoist + helper call, SwitchTab, ClickTab). 3 explicit clear_selection() calls in workspace.rs precede the 3 bare active_workspace_idx writes. 2 new TDD tests (tab_switch_clears_selection, workspace_switch_clears_selection) + 2 fixture builders. CloseTab retarget consolidation deviation (5 events.rs matches vs plan's 6 expected) auto-fixed Rule 3 — semantically identical, just routes through the helper exactly once instead of conditionally fanning. 126 full suite green; zero warnings.
 - Phase 06-05: REVERSED-XOR highlight body replaces gold-accent at src/ui/terminal.rs:156-198 — single cell.modifier.toggle(Modifier::REVERSED) per highlighted cell satisfies both D-20 and D-21 (RESEARCH §Q7 OQ-4 simplification adopted). Anchored-coord translation per D-06 + D-08 — endpoints carry (gen, row, col); render translates row -= (current_gen - sel_gen) with i64 cast + .max(0) clip; er_translated < 0 short-circuits when entire selection has scrolled off (preserves SelectionState in app state for cmd+c-via-snapshot). render() signature gains final current_gen: u64 parameter; sole caller in src/ui/draw.rs reads session.scroll_generation.load(Relaxed). 3 new render tests via ratatui::backend::TestBackend; 129 full suite green; zero deviations.
+- Phase 07 COMPLETE 2026-04-25: dual-path PTY-pane selection — non-mouse-app sessions now delegate to tmux's native copy-mode (forwarded SGR mouse bytes + tmux 3.6a defaults + 3-line ensure_config override for y/Enter/Escape); mouse-app sessions retain Phase 6 REVERSED-XOR overlay end-to-end. Auto-copy on mouse-up via copy-pipe-and-cancel — selection lands on macOS clipboard the moment drag ends, no cmd+c needed. cmd+c 3-tier precedence (overlay → tmux save-buffer | pbcopy → SIGINT) and Esc 3-tier precedence (overlay clear → forward 0x1b → fall-through) wired in handle_key. set_active_tab D-16 cancels outgoing tmux copy-mode before active_tab mutation. Operator UAT 2026-04-25 confirmed YES on "feels indistinguishable from Ghostty+tmux direct"; all UAT-7-A..K + PIT-7-1/6 + Phase 6 SEL-01..04 regression sweep PASS. Test suite 145 green (130 baseline + 15 Phase 7 tests). Two Rule 1 deviations auto-fixed during execution: DECSET 1006h is wire-format flag not mode-set (use 1000h for vt100 mouse_protocol_mode toggle); TM-CONF-01 negative assertion required comment-text rephrase to avoid literal MouseDragEnd1Pane token.
 
 ### Pending Todos
 
@@ -124,11 +131,11 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 7 context gathered
-Resume file: --resume-file
-Next: Phase 6 Plan 05 (Wave 3) — render-path selection translation: anchored (gen, row, col) → current screen rows via PtySession.scroll_generation, with off-screen clipping (D-08). Plan 06-06 (clear_selection wiring) executed out-of-roadmap-order ahead of 06-05 because it has no dependency on render-path translation; 5 of 6 Phase 6 plans now complete.
+Last session: 2026-04-25
+Stopped at: Phase 7 closed (PHASE-SUMMARY.md + tracking updates committed)
+Resume file: None
+Next: TBD — Phase 7 was the last open milestone in the v1 roadmap; Phase 5 plans (05-02..05-04) and Phase 4 (TBD plans) remain open from earlier waves and may be the next focus.
 
-**Completed Phase:** 3 (PTY Input Fluidity) — 1 of 1 plan executed (03-02 skipped per UAT) — 2026-04-24
+**Completed Phase:** 7 (tmux-native main-screen selection) — 6 of 6 plans executed; operator UAT signed off "approved" — 2026-04-25
 
 **Planned Phase:** 7 (tmux-native main-screen selection) — 6 plans — 2026-04-25T14:01:45.932Z

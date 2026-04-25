@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Navigation Fluidity** - Sidebar, workspace, and tab switching all respond instantly with no stutter on keyboard or mouse
 - [x] **Phase 5: Background Work Decoupling** - Diff refresh, file watcher, and state save never block the event loop or cause random lag spikes
 - [x] **Phase 6: Text Selection** - Drag-select + `cmd+c` copy in the PTY pane, Ghostty-style, with a highlight that survives streaming output (2026-04-25)
-- [ ] **Phase 7: tmux-native main-screen selection** - Migrate PTY-pane selection from Martins' REVERSED-XOR overlay to the underlying tmux session's native copy-mode, so selection feels indistinguishable from running tmux directly
+- [x] **Phase 7: tmux-native main-screen selection** - Migrate PTY-pane selection from Martins' REVERSED-XOR overlay to the underlying tmux session's native copy-mode, so selection feels indistinguishable from running tmux directly (2026-04-25)
 
 ## Phase Details
 
@@ -134,7 +134,7 @@ Plans:
 - [x] 07-03-PLAN.md — Wave 1: App helpers (active_session_delegates_to_tmux, active_tmux_session_name, tmux_in_copy_mode_*, tmux_drag_seen_*) + set_active_tab D-16 cancel-outgoing
 - [x] 07-04-PLAN.md — Wave 2: handle_mouse conditional intercept (delegate→forward SGR; else→Phase 6 overlay) + TM-DISPATCH-01..04 tests
 - [x] 07-05-PLAN.md — Wave 3: handle_key cmd+c 3-tier precedence + Esc 3-tier precedence + TM-CMDC/ESC/CANCEL tests
-- [ ] 07-06-PLAN.md — Wave 4: dual-path operator UAT (UAT-7-A..K) + PHASE-SUMMARY.md
+- [x] 07-06-PLAN.md — Wave 4: dual-path operator UAT (UAT-7-A..K) + PHASE-SUMMARY.md
 
 ## Progress
 
@@ -149,7 +149,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Navigation Fluidity | 0/TBD | Not started | - |
 | 5. Background Work Decoupling | 0/4 | Not started | - |
 | 6. Text Selection | 6/6 | Complete | 2026-04-25 |
-| 7. tmux-native main-screen selection | 0/6 | Not started | - |
+| 7. tmux-native main-screen selection | 6/6 | Complete | 2026-04-25 |
 
 ## Backlog
 

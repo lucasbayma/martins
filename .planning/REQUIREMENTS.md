@@ -29,13 +29,13 @@ Requirements for the fluidity milestone. Each maps to exactly one roadmap phase.
 <!-- Ghostty-style drag-select + cmd+c copy in the main PTY pane. -->
 
 - [x] **SEL-01
-**: Mouse drag on the PTY main pane starts a text selection with a visible highlight that tracks the cursor with no lag
+**: Mouse drag on the PTY main pane starts a text selection with a visible highlight that tracks the cursor with no lag — Validated again in Phase 7 (tmux-native + overlay dual path) on 2026-04-25
 - [x] **SEL-02
-**: `cmd+c` while a selection is active copies the selected text to the macOS clipboard via `pbcopy`
+**: `cmd+c` while a selection is active copies the selected text to the macOS clipboard via `pbcopy` — Validated again in Phase 7 (tmux-native + overlay dual path) on 2026-04-25
 - [x] **SEL-03
-**: Click (or Escape) outside the selection clears the highlight immediately
+**: Click (or Escape) outside the selection clears the highlight immediately — Validated again in Phase 7 (tmux-native + overlay dual path) on 2026-04-25
 - [x] **SEL-04
-**: Selection highlight does not flicker or disappear when the underlying PTY buffer receives new output — the selection stays stable until the user clears it
+**: Selection highlight does not flicker or disappear when the underlying PTY buffer receives new output — the selection stays stable until the user clears it — Validated again in Phase 7 (tmux-native + overlay dual path) on 2026-04-25
 
 ### Background Work
 
