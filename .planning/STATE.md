@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
+status: executing
 stopped_at: Phase 6 context gathered
-last_updated: "2026-04-25T01:42:07.751Z"
-last_activity: 2026-04-24
+last_updated: "2026-04-25T01:45:09.988Z"
+last_activity: 2026-04-25 -- Phase 06 execution started
 progress:
   total_phases: 6
   completed_phases: 5
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Input-to-pixel responsiveness must feel like a native GPU-accelerated terminal (Ghostty/Alacritty baseline).
-**Current focus:** Phase 06 — text-selection (next)
+**Current focus:** Phase 06 — text-selection
 
 ## Current Position
 
-Phase: 05 (background-work-decoupling) — COMPLETE
-Plan: 4 of 4 (UAT closed 5/5 PASS, PHASE-SUMMARY.md written)
-Status: Ready to plan Phase 6
-Last activity: 2026-04-24
+Phase: 06 (text-selection) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 06
+Last activity: 2026-04-25 -- Phase 06 execution started
 
 Progress: [██████████] 100%
 
