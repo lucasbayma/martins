@@ -398,6 +398,13 @@ impl App {
     /// route through this instead of writing `self.active_tab = ...`
     /// directly.
     pub(crate) fn set_active_tab(&mut self, index: usize) {
+        // Phase 7 D-16: cancel any tmux copy-mode selection on the OUTGOING
+        // active session BEFORE mutating active_tab. Fire-and-forget; idempotent
+        // (exits 1 with stderr "not in a mode" when no copy-mode active —
+        // discarded per crate::tmux::cancel_copy_mode contract).
+        if let Some(name) = self.active_tmux_session_name() {
+            crate::tmux::cancel_copy_mode(&name);
+        }
         self.clear_selection();
         self.active_tab = index;
         self.mark_dirty();
@@ -534,6 +541,87 @@ impl App {
         session
             .scroll_generation
             .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Phase 7 (D-07): returns true when the active session's inner program has NOT
+    /// requested mouse mode AND is NOT on alternate screen. In that state,
+    /// Down/Drag/Up(Left) events are forwarded as SGR bytes to the tmux client,
+    /// which owns visual feedback via its native copy-mode (Plan 07-04).
+    ///
+    /// Per 07-RESEARCH.md §State Source: vt100 already tracks DECSET 9/1000/1002/1003
+    /// — no parallel byte scanner needed. Parser try_read contention falls back to
+    /// "not delegating" (overlay path runs, harmless one-frame visual blip if any).
+    pub(crate) fn active_session_delegates_to_tmux(&self) -> bool {
+        let sessions = self.active_sessions();
+        let Some((_, session)) = sessions.get(self.active_tab) else {
+            return false;
+        };
+        let Ok(parser) = session.parser.try_read() else {
+            return false;
+        };
+        let screen = parser.screen();
+        matches!(screen.mouse_protocol_mode(), vt100::MouseProtocolMode::None)
+            && !screen.alternate_screen()
+    }
+
+    /// Phase 7 (D-10, D-16): synthesize the `martins-{shortid}-{workspace}-{tab_id}`
+    /// session name for the active tab — used by cmd+c Tier 2 (`tmux save-buffer`)
+    /// and tab-switch cancel (`tmux send-keys -X cancel`).
+    pub(crate) fn active_tmux_session_name(&self) -> Option<String> {
+        let project = self.active_project()?;
+        let workspace = self.active_workspace()?;
+        let tab = workspace.tabs.get(self.active_tab)?;
+        Some(crate::tmux::tab_session_name(&project.id, &workspace.name, tab.id))
+    }
+
+    /// Phase 7 (D-14): read the active session's tmux_in_copy_mode flag. Set on
+    /// forwarded Down(Left) when delegating; cleared on Up(Left)+no-drag, on
+    /// Esc-cancel forward, on tab/workspace switch. Read by handle_key Esc handler
+    /// (Plan 07-05) to decide whether to forward `\x1b` byte to PTY.
+    pub(crate) fn tmux_in_copy_mode(&self) -> bool {
+        let sessions = self.active_sessions();
+        let Some((_, session)) = sessions.get(self.active_tab) else {
+            return false;
+        };
+        session
+            .tmux_in_copy_mode
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Phase 7 (D-14): set the active session's tmux_in_copy_mode flag. No-op when
+    /// no active session (defensive — Plan 07-04 may call during tab-switch race).
+    pub(crate) fn tmux_in_copy_mode_set(&self, value: bool) {
+        let sessions = self.active_sessions();
+        if let Some((_, session)) = sessions.get(self.active_tab) {
+            session
+                .tmux_in_copy_mode
+                .store(value, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// Phase 7 (handle_mouse drag-state machine): set drag_seen flag when a
+    /// Drag(Left) is forwarded. Read+cleared by tmux_drag_seen_take on Up(Left).
+    pub(crate) fn tmux_drag_seen_set(&self, value: bool) {
+        let sessions = self.active_sessions();
+        if let Some((_, session)) = sessions.get(self.active_tab) {
+            session
+                .tmux_drag_seen
+                .store(value, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// Phase 7 (handle_mouse drag-state machine): atomically read drag_seen AND
+    /// reset it to false. Used on Up(Left) to distinguish "click without drag"
+    /// (Up clears tmux_in_copy_mode because tmux never entered copy-mode) from
+    /// "click→drag→release" (Up keeps tmux_in_copy_mode = true).
+    pub(crate) fn tmux_drag_seen_take(&self) -> bool {
+        let sessions = self.active_sessions();
+        let Some((_, session)) = sessions.get(self.active_tab) else {
+            return false;
+        };
+        session
+            .tmux_drag_seen
+            .swap(false, std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Compute the word-boundary `(start_col, end_col)` containing `col` on
