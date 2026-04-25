@@ -77,8 +77,19 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                     }
                     sel.dragging = false;
                     sel.end_gen = Some(app.active_scroll_generation());
+                    // MINOR-01: only store snapshot when materialization
+                    // actually returned text. `materialize_selection_text`
+                    // returns `String::new()` on parser try_read contention
+                    // OR when the selection's visible content is genuinely
+                    // empty. Storing `Some("")` would defeat the live
+                    // re-materialization fallback in
+                    // `copy_selection_to_clipboard` (which uses
+                    // `unwrap_or_else` — a `Some("")` short-circuits the
+                    // fallback and `pbcopy` writes nothing).
                     let text = app.materialize_selection_text(&sel);
-                    sel.text = Some(text);
+                    if !text.is_empty() {
+                        sel.text = Some(text);
+                    }
                     app.selection = Some(sel);
                     app.copy_selection_to_clipboard();
                     app.mark_dirty();
