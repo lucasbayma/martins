@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: milestone_complete
-stopped_at: Completed 06-05-PLAN.md
-last_updated: "2026-04-25T11:28:40.575Z"
+status: completed
+stopped_at: Phase 7 context gathered
+last_updated: "2026-04-25T13:02:19.697Z"
 last_activity: 2026-04-25
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 6
   total_plans: 22
-  completed_plans: 22
+  completed_plans: 25
   percent: 100
 ---
 
@@ -124,9 +124,9 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-25T11:28:30.698Z
-Stopped at: Completed 06-05-PLAN.md
-Resume file: None
+Last session: --stopped-at
+Stopped at: Phase 7 context gathered
+Resume file: --resume-file
 Next: Phase 6 Plan 05 (Wave 3) — render-path selection translation: anchored (gen, row, col) → current screen rows via PtySession.scroll_generation, with off-screen clipping (D-08). Plan 06-06 (clear_selection wiring) executed out-of-roadmap-order ahead of 06-05 because it has no dependency on render-path translation; 5 of 6 Phase 6 plans now complete.
 
 **Completed Phase:** 3 (PTY Input Fluidity) — 1 of 1 plan executed (03-02 skipped per UAT) — 2026-04-24
