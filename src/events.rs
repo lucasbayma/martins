@@ -152,7 +152,6 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 }
                 app.last_click_at = Some(now);
                 app.last_click_row = mouse.row;
-                app.last_click_col = mouse.column;
 
                 // D-15: dispatch on click count.
                 match app.last_click_count {
@@ -172,7 +171,6 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 app.last_click_count = 1;
                 app.last_click_at = Some(std::time::Instant::now());
                 app.last_click_row = mouse.row;
-                app.last_click_col = mouse.column;
             }
             handle_click(app, mouse.column, mouse.row).await;
         }
