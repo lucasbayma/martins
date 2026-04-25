@@ -468,15 +468,15 @@ impl App {
             return;
         }
 
-        let sessions = self.active_sessions();
-        let Some((_, session)) = sessions.get(self.active_tab) else { return };
-        let Ok(parser) = session.parser.try_read() else { return };
-
-        let screen = parser.screen();
-        let ((sc, sr), (ec, er)) = sel.normalized();
-        let text = screen.contents_between(sr, sc, er, ec.saturating_add(1));
+        // Prefer the text snapshot captured at mouse-up (sel.text from D-02).
+        // It survives scroll-off because vt100's `contents_between` only
+        // iterates visible rows. Fall back to live materialization when no
+        // snapshot exists (e.g. selection seeded programmatically).
+        let text = sel
+            .text
+            .clone()
+            .unwrap_or_else(|| self.materialize_selection_text(sel));
         let trimmed = text.trim_end().to_string();
-
         if trimmed.is_empty() {
             return;
         }
@@ -491,6 +491,256 @@ impl App {
                 }
                 child.wait().map(|_| ())
             });
+    }
+
+    /// Materialize the visible text inside `sel` from the active session's
+    /// vt100 screen. Returns the empty string when the active session can't
+    /// be acquired or no rows match.
+    ///
+    /// Called from `copy_selection_to_clipboard` (snapshot fallback) AND
+    /// from `handle_mouse::Up(Left)` (snapshot capture into `sel.text`).
+    pub(crate) fn materialize_selection_text(&self, sel: &SelectionState) -> String {
+        let sessions = self.active_sessions();
+        let Some((_, session)) = sessions.get(self.active_tab) else {
+            return String::new();
+        };
+        let Ok(parser) = session.parser.try_read() else {
+            return String::new();
+        };
+        let screen = parser.screen();
+        let ((sc, sr), (ec, er)) = sel.normalized();
+        screen
+            .contents_between(sr, sc, er, ec.saturating_add(1))
+            .trim_end()
+            .to_string()
+    }
+
+    /// Read the active session's `scroll_generation` counter. Returns 0
+    /// when no active session is available — a safe default since gen=0 is
+    /// also the initial value at session spawn (Plan 02).
+    pub(crate) fn active_scroll_generation(&self) -> u64 {
+        let sessions = self.active_sessions();
+        let Some((_, session)) = sessions.get(self.active_tab) else {
+            return 0;
+        };
+        session
+            .scroll_generation
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Compute the word-boundary `(start_col, end_col)` containing `col` on
+    /// `row`. Word chars = non-whitespace AND not in the punctuation
+    /// blacklist (see RESEARCH §Q3). Skips `is_wide_continuation()` cells
+    /// when walking left/right so wide CJK / emoji glyphs are treated as
+    /// a single character. Returns `None` if no active session.
+    fn word_boundary_at(&self, row: u16, col: u16) -> Option<(u16, u16)> {
+        let sessions = self.active_sessions();
+        let (_, session) = sessions.get(self.active_tab)?;
+        let parser = session.parser.try_read().ok()?;
+        let screen = parser.screen();
+        let (_, cols) = screen.size();
+        let is_word_char = |s: &str| -> bool {
+            s.chars().next().is_some_and(|c| {
+                !c.is_whitespace()
+                    && !matches!(
+                        c,
+                        '[' | ']'
+                            | '('
+                            | ')'
+                            | '<'
+                            | '>'
+                            | '{'
+                            | '}'
+                            | '.'
+                            | ','
+                            | ';'
+                            | ':'
+                            | '!'
+                            | '?'
+                            | '\''
+                            | '"'
+                            | '`'
+                            | '/'
+                            | '\\'
+                            | '|'
+                            | '@'
+                            | '#'
+                            | '$'
+                            | '%'
+                            | '^'
+                            | '&'
+                            | '*'
+                            | '='
+                            | '+'
+                            | '~'
+                    )
+            })
+        };
+        let prev_col = |c: u16| {
+            if c == 0 {
+                return 0;
+            }
+            let mut nc = c - 1;
+            while nc > 0
+                && screen
+                    .cell(row, nc)
+                    .is_some_and(|cl| cl.is_wide_continuation())
+            {
+                nc -= 1;
+            }
+            nc
+        };
+        let next_col = |c: u16| {
+            let mut nc = c + 1;
+            while nc < cols
+                && screen
+                    .cell(row, nc)
+                    .is_some_and(|cl| cl.is_wide_continuation())
+            {
+                nc += 1;
+            }
+            nc
+        };
+        let mut start = col;
+        while start > 0 {
+            let p = prev_col(start);
+            let Some(cell) = screen.cell(row, p) else { break };
+            if !cell.has_contents() || !is_word_char(cell.contents()) {
+                break;
+            }
+            start = p;
+        }
+        let mut end = col;
+        while end + 1 < cols {
+            let n = next_col(end);
+            let Some(cell) = screen.cell(row, n) else { break };
+            if !cell.has_contents() || !is_word_char(cell.contents()) {
+                break;
+            }
+            end = n;
+        }
+        Some((start, end))
+    }
+
+    /// D-15 — Select the word containing `(row, col)` on the active
+    /// session's screen. Anchored to the current `scroll_generation` for
+    /// both endpoints. Snapshots text immediately so cmd+c works post
+    /// scroll-off.
+    ///
+    /// Uses the "compute-read-only-first, then mutate" pattern: all
+    /// `&self` reads happen before the single `&mut self.selection` write,
+    /// avoiding borrow-checker conflicts between `active_sessions()` /
+    /// `materialize_selection_text` (both `&self`) and the mutation.
+    pub(crate) fn select_word_at(&mut self, row: u16, col: u16) {
+        // Compute all read-only values BEFORE any &mut self.selection borrow.
+        let Some((start, end)) = self.word_boundary_at(row, col) else {
+            return;
+        };
+        let current_gen = self.active_scroll_generation();
+
+        // Build the SelectionState (no borrow yet).
+        let new_sel = SelectionState {
+            start_col: start,
+            start_row: row,
+            start_gen: current_gen,
+            end_col: end,
+            end_row: row,
+            end_gen: Some(current_gen),
+            dragging: false,
+            text: None,
+        };
+
+        // Snapshot text via &self call (still no &mut borrow).
+        let text = self.materialize_selection_text(&new_sel);
+
+        // Single &mut self.selection borrow at end.
+        self.selection = Some(SelectionState {
+            text: Some(text),
+            ..new_sel
+        });
+        self.mark_dirty();
+    }
+
+    /// D-15 / D-18 — Select the visible row containing `row` from col=0 to
+    /// the last non-whitespace column. Wrapped lines are NOT joined (D-18
+    /// scope decision: vt100 visible row only).
+    pub(crate) fn select_line_at(&mut self, row: u16) {
+        // Block-scope the parser read so it drops at the inner block end.
+        let (end, current_gen) = {
+            let sessions = self.active_sessions();
+            let Some((_, session)) = sessions.get(self.active_tab) else {
+                return;
+            };
+            let Ok(parser) = session.parser.try_read() else {
+                return;
+            };
+            let screen = parser.screen();
+            let (_, cols) = screen.size();
+            let mut end = 0u16;
+            for c in 0..cols {
+                if let Some(cell) = screen.cell(row, c)
+                    && cell.has_contents()
+                    && cell
+                        .contents()
+                        .chars()
+                        .next()
+                        .is_some_and(|ch| !ch.is_whitespace())
+                {
+                    end = c;
+                }
+            }
+            let gen_count = session
+                .scroll_generation
+                .load(std::sync::atomic::Ordering::Relaxed);
+            (end, gen_count)
+            // `parser` and `sessions` drop here at block end.
+        };
+
+        let new_sel = SelectionState {
+            start_col: 0,
+            start_row: row,
+            start_gen: current_gen,
+            end_col: end,
+            end_row: row,
+            end_gen: Some(current_gen),
+            dragging: false,
+            text: None,
+        };
+        let text = self.materialize_selection_text(&new_sel);
+        self.selection = Some(SelectionState {
+            text: Some(text),
+            ..new_sel
+        });
+        self.mark_dirty();
+    }
+
+    /// D-19 — Extend the END endpoint of the active selection to
+    /// `(row, col)`. No-op if no selection exists. Re-anchors `end_gen`
+    /// to the current `scroll_generation` and refreshes the text snapshot.
+    ///
+    /// Uses the "compute-read-only-first, then &mut borrow" pattern to
+    /// avoid borrow-checker conflicts (active_scroll_generation +
+    /// materialize_selection_text are &self).
+    pub(crate) fn extend_selection_to(&mut self, row: u16, col: u16) {
+        // Compute read-only values BEFORE taking any &mut self.selection borrow.
+        let current_gen = self.active_scroll_generation();
+        let Some(sel_snapshot) = self.selection.as_ref().cloned() else {
+            return;
+        };
+
+        // Build the post-mutation snapshot to feed materialize.
+        let mut next_sel = sel_snapshot;
+        next_sel.end_col = col;
+        next_sel.end_row = row;
+        next_sel.end_gen = Some(current_gen);
+
+        // Materialize text via &self before taking &mut borrow.
+        let text = self.materialize_selection_text(&next_sel);
+        next_sel.text = Some(text);
+
+        // Single &mut self.selection write.
+        self.selection = Some(next_sel);
+        self.mark_dirty();
     }
 
     pub(crate) fn forward_key_to_pty(&mut self, key: &KeyEvent) {

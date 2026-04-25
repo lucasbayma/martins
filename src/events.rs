@@ -47,14 +47,17 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 let inner = terminal_content_rect(app.last_panes.as_ref().unwrap().terminal);
                 let col = mouse.column.saturating_sub(inner.x).min(inner.width.saturating_sub(1));
                 let row = mouse.row.saturating_sub(inner.y).min(inner.height.saturating_sub(1));
+                let current_gen = app.active_scroll_generation();
                 if let Some(sel) = &mut app.selection {
+                    // Mid-drag extension: only the live cursor endpoint moves.
+                    // end_gen stays None and text stays None until Up (D-07).
                     sel.end_col = col;
                     sel.end_row = row;
                 } else {
                     app.selection = Some(SelectionState {
                         start_col: col,
                         start_row: row,
-                        start_gen: 0,
+                        start_gen: current_gen,
                         end_col: col,
                         end_row: row,
                         end_gen: None,
@@ -62,15 +65,24 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                         text: None,
                     });
                 }
+                app.mark_dirty();
                 return;
             }
             MouseEventKind::Up(MouseButton::Left) => {
-                if let Some(sel) = app.selection.take() {
-                    if !sel.is_empty() {
-                        app.selection = Some(sel);
-                        app.copy_selection_to_clipboard();
+                if let Some(mut sel) = app.selection.take() {
+                    if sel.is_empty() {
+                        // Empty selection — leave app.selection as None (D-04 inverse).
+                        app.mark_dirty();
                         return;
                     }
+                    sel.dragging = false;
+                    sel.end_gen = Some(app.active_scroll_generation());
+                    let text = app.materialize_selection_text(&sel);
+                    sel.text = Some(text);
+                    app.selection = Some(sel);
+                    app.copy_selection_to_clipboard();
+                    app.mark_dirty();
+                    return;
                 }
             }
             _ => {}
@@ -79,23 +91,78 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
 
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left) => {
+            // D-19: Shift+click takes precedence — extends end of existing
+            // selection. No-op if no selection active.
+            if mouse.modifiers.contains(KeyModifiers::SHIFT) {
+                if app.selection.is_some() && in_terminal {
+                    let inner = terminal_content_rect(app.last_panes.as_ref().unwrap().terminal);
+                    let col = mouse
+                        .column
+                        .saturating_sub(inner.x)
+                        .min(inner.width.saturating_sub(1));
+                    let row = mouse
+                        .row
+                        .saturating_sub(inner.y)
+                        .min(inner.height.saturating_sub(1));
+                    app.extend_selection_to(row, col);
+                    return;
+                }
+                // No selection + shift+click = no-op (D-19).
+                return;
+            }
+            // D-12 / D-13: any plain Down(Left) clears the active selection.
+            // D-23: dirty-mark in the same scope as the mutation.
             if app.selection.is_some() {
                 app.selection = None;
+                app.mark_dirty();
             }
             // D-16: maintain a 300ms click cluster counter. Reset to 1 if
             // the click lands at a different row OR exceeds the threshold.
-            let now = std::time::Instant::now();
-            let within_threshold = app
-                .last_click_at
-                .is_some_and(|t| now.duration_since(t) < std::time::Duration::from_millis(300));
-            if within_threshold && mouse.row == app.last_click_row {
-                app.last_click_count = app.last_click_count.saturating_add(1);
+            // Click-counter logic only meaningful inside the terminal pane.
+            if in_terminal {
+                let inner = terminal_content_rect(app.last_panes.as_ref().unwrap().terminal);
+                let inner_col = mouse
+                    .column
+                    .saturating_sub(inner.x)
+                    .min(inner.width.saturating_sub(1));
+                let inner_row = mouse
+                    .row
+                    .saturating_sub(inner.y)
+                    .min(inner.height.saturating_sub(1));
+                let now = std::time::Instant::now();
+                let within_threshold = app
+                    .last_click_at
+                    .is_some_and(|t| now.duration_since(t) < std::time::Duration::from_millis(300));
+                let same_row = mouse.row == app.last_click_row;
+                if within_threshold && same_row {
+                    app.last_click_count = app.last_click_count.saturating_add(1);
+                } else {
+                    app.last_click_count = 1;
+                }
+                app.last_click_at = Some(now);
+                app.last_click_row = mouse.row;
+                app.last_click_col = mouse.column;
+
+                // D-15: dispatch on click count.
+                match app.last_click_count {
+                    2 => {
+                        app.select_word_at(inner_row, inner_col);
+                        return;
+                    }
+                    3 => {
+                        app.select_line_at(inner_row);
+                        return;
+                    }
+                    _ => {}
+                }
             } else {
+                // Outside terminal: still maintain reset semantics so a
+                // subsequent in-terminal click starts fresh.
                 app.last_click_count = 1;
+                app.last_click_at = Some(std::time::Instant::now());
+                app.last_click_row = mouse.row;
+                app.last_click_col = mouse.column;
             }
-            app.last_click_at = Some(now);
-            app.last_click_row = mouse.row;
-            app.last_click_col = mouse.column;
             handle_click(app, mouse.column, mouse.row).await;
         }
         MouseEventKind::ScrollUp => handle_scroll(app, mouse.column, mouse.row, -1),
