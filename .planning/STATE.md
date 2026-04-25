@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-04-25T10:56:50.355Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-04-25T11:05:20.068Z"
 last_activity: 2026-04-25
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 22
-  completed_plans: 21
-  percent: 95
+  completed_plans: 22
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-23)
 ## Current Position
 
 Phase: 06 (text-selection) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-04-25
 
-Progress: [██████████] 95%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [██████████] 95%
 | Phase 05 P02 | 25 | 3 tasks | 2 files |
 | Phase 05 P03 | 5m | 3 tasks | 4 files |
 | Phase 06 P06-02 | 8m | 2 tasks | 2 files |
+| Phase 06 P06-03 | 12m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,7 @@ Recent decisions affecting current work:
 - Phase 05-02: 4 deviations all auto-fixed (1 Rule 3 dead_code allow, 3 Rule 1 watcher test fixes — tightened test bursts to back-to-back writes, pre-create noise dirs + drain FSEvents historical buffer in filter_noise); zero assertion loosening, zero #[ignore], zero production code changes beyond the 4 planned edits
 - Phase 05-03: 13 hot-path save_state() sites migrated to save_state_spawn() (events.rs=4, workspace.rs=7, modal_controller.rs=2); archive_active_workspace + delete_archived_workspace remove_dir_all calls wrapped in tokio::task::spawn_blocking (Rule 2 — both bare calls had identical blocking concern; net: 0 bare remove_dir_all in workspace.rs); #[allow(dead_code)] removed from save_state_spawn; graceful-exit drain at src/app.rs:264 preserved (Pitfall #5)
 - Phase 06-02: PtySession.scroll_generation Arc<AtomicU64> field added; PTY reader thread wraps parser.process with SCROLLBACK-LEN heuristic (cursor-at-bottom AND top-row-hash-changed); row_hash free function over screen.cell.contents; Ordering::Relaxed sufficient (T-06-04); test renamed gen→gen_count for Rust 2024
+- Phase 06-03: handle_mouse Drag/Up/Down extended to anchor SelectionState at session.scroll_generation, snapshot text on Up via materialize_selection_text, dispatch double/triple/shift-click; 5 new App helpers (materialize_selection_text, active_scroll_generation, select_word_at, select_line_at, extend_selection_to) + private word_boundary_at; compute-read-only-first / then-&mut-borrow pattern resolves borrow-checker conflicts between &self readers and &mut self.selection writes; click counter resets on outside-terminal clicks (Rule 2 missing-functionality auto-fix); 13 selection tests + 122 full suite green
 
 ### Pending Todos
 
@@ -115,10 +117,10 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-25T10:56:50.349Z
-Stopped at: Completed 06-02-PLAN.md
+Last session: 2026-04-25T11:30:00.000Z
+Stopped at: Completed 06-03-PLAN.md
 Resume file: None
-Next: Phase 5 Plan 02 (Wave 1) — implement App::save_state_spawn (makes BG-05 gate compile + pass) and tighten watcher debounce 750ms → 200ms
+Next: Phase 6 Plan 04 (Wave 2) — cmd+c key handling: route SUPER+c to copy_selection_to_clipboard when selection active, else send 0x03 SIGINT in Terminal mode
 
 **Completed Phase:** 3 (PTY Input Fluidity) — 1 of 1 plan executed (03-02 skipped per UAT) — 2026-04-24
 
