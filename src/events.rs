@@ -369,6 +369,34 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    // D-02, D-03: cmd+c with selection re-copies; without selection in Terminal mode forwards SIGINT.
+    if key.code == KeyCode::Char('c')
+        && key.modifiers.contains(KeyModifiers::SUPER)
+    {
+        if let Some(sel) = &app.selection {
+            if !sel.is_empty() {
+                app.copy_selection_to_clipboard();
+                // D-04: do NOT clear selection after copy.
+                return;
+            }
+        }
+        if app.mode == InputMode::Terminal {
+            app.write_active_tab_input(&[0x03]);
+            return;
+        }
+        // Normal mode, no selection — fall through to keymap (ctrl+c Quit path unchanged).
+    }
+
+    // D-14: Esc clears selection IFF active; else falls through to existing path.
+    if key.code == KeyCode::Esc
+        && key.modifiers == KeyModifiers::NONE
+        && app.selection.is_some()
+    {
+        app.selection = None;
+        app.mark_dirty();
+        return;
+    }
+
     if app.mode == InputMode::Terminal {
         if key.code == KeyCode::Char('b')
             && key.modifiers.contains(KeyModifiers::CONTROL)

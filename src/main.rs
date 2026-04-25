@@ -28,7 +28,10 @@ mod selection_tests;
 
 use anyhow::Result;
 use clap::Parser;
-use crossterm::{event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture}, execute};
+use crossterm::{event::{
+    DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+    KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+}, execute};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -70,14 +73,24 @@ async fn main() -> Result<()> {
     }
 
     let mut terminal = ratatui::init();
-    execute!(std::io::stdout(), EnableMouseCapture, EnableBracketedPaste)?;
+    execute!(
+        std::io::stdout(),
+        EnableMouseCapture,
+        EnableBracketedPaste,
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES),
+    )?;
 
     let result = match app::App::new(global_state, state_path).await {
         Ok(mut app) => app.run(&mut terminal).await,
         Err(error) => Err(error),
     };
 
-    let _ = execute!(std::io::stdout(), DisableMouseCapture, DisableBracketedPaste);
+    let _ = execute!(
+        std::io::stdout(),
+        PopKeyboardEnhancementFlags,
+        DisableMouseCapture,
+        DisableBracketedPaste,
+    );
     ratatui::restore();
     result
 }

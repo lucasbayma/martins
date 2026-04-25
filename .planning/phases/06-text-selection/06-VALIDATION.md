@@ -61,6 +61,17 @@ created: 2026-04-24
 
 ---
 
+## Manual-Only UAT (06-04 deferred from automation)
+
+| UAT-ID | Behavior | Procedure | Pass criteria |
+|--------|----------|-----------|---------------|
+| UAT-06-04-A | cmd+c with no selection in Terminal mode forwards SIGINT to active PTY | 1. Launch Martins; in active tab run `sleep 30`. 2. Confirm no selection is active (drag-select, then Esc to clear). 3. Press cmd+c. | `sleep` exits within 1s with the shell prompt re-displayed; no clipboard write occurred (verify by pasting into a notes app — clipboard contains whatever was there before). |
+| UAT-06-04-B | Esc with no selection in Terminal mode forwards 0x1b to active PTY (preserves Phase 5 behavior) | 1. Launch Martins; in active tab run `vim` (or `nvim`). 2. Press `i` to enter insert mode. 3. Press Esc. | Vim returns to Normal mode (status bar at bottom changes from `-- INSERT --` to empty/`-- NORMAL --`). |
+
+Rationale: automating these would require either a test-mode branch in `App::write_active_tab_input` (rejected per CLAUDE.md minimal-surface) or fragile subprocess echo semantics. Manual UAT covers them deterministically on the operator's macOS shell.
+
+---
+
 ## Validation Sign-Off
 
 - [ ] All tasks have `<automated>` verify or Wave 0 dependencies
