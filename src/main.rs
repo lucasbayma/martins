@@ -26,6 +26,9 @@ mod navigation_tests;
 #[cfg(test)]
 mod selection_tests;
 
+#[cfg(test)]
+mod tmux_native_selection_tests;
+
 use anyhow::Result;
 use clap::Parser;
 use crossterm::{event::{
