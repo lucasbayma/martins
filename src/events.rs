@@ -478,10 +478,15 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
-    // D-02, D-03: cmd+c with selection re-copies; without selection in Terminal mode forwards SIGINT.
+    // D-02, D-03 (Phase 6) + D-10, D-11 (Phase 7): cmd+c precedence chain.
+    //   Tier 1 — overlay selection → copy snapshot text via existing path.
+    //   Tier 2 — delegating session with non-empty tmux paste-buffer → spawn
+    //            `tmux save-buffer - -t <session> | pbcopy` off-thread.
+    //   Tier 3 — Terminal mode without either → SIGINT (0x03) to PTY.
     if key.code == KeyCode::Char('c')
         && key.modifiers.contains(KeyModifiers::SUPER)
     {
+        // Tier 1 (Phase 6, unchanged): overlay selection.
         if let Some(sel) = &app.selection {
             if !sel.is_empty() {
                 app.copy_selection_to_clipboard();
@@ -489,21 +494,53 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) {
                 return;
             }
         }
+        // Tier 2 (Phase 7 D-10): tmux paste-buffer when delegating.
+        // Spawn off-thread to keep cmd+c sub-50ms even on cold tmux client.
+        // save_buffer_to_pbcopy returns false silently when no buffer present
+        // (RESEARCH §Subprocess Behavior); the user-visible effect of "no buffer"
+        // is identical to "buffer was empty" — pbcopy receives nothing and the
+        // existing clipboard contents are preserved.
+        if app.active_session_delegates_to_tmux() {
+            if let Some(session_name) = app.active_tmux_session_name() {
+                tokio::task::spawn_blocking(move || {
+                    crate::tmux::save_buffer_to_pbcopy(&session_name);
+                });
+                return;
+            }
+        }
+        // Tier 3 (Phase 6, unchanged): SIGINT in Terminal mode.
         if app.mode == InputMode::Terminal {
             app.write_active_tab_input(&[0x03]);
             return;
         }
-        // Normal mode, no selection — fall through to keymap (ctrl+c Quit path unchanged).
+        // Normal mode + no selection + not delegating — fall through to keymap
+        // (ctrl+c → Quit path unchanged).
     }
 
-    // D-14: Esc clears selection IFF active; else falls through to existing path.
-    if key.code == KeyCode::Esc
-        && key.modifiers == KeyModifiers::NONE
-        && app.selection.is_some()
-    {
-        app.selection = None;
-        app.mark_dirty();
-        return;
+    // D-14 (Phase 6) + D-14 (Phase 7): Esc precedence chain.
+    //   Tier 1 — overlay selection active → clear locally (Phase 6, unchanged).
+    //   Tier 2 — delegating + tmux in copy-mode → forward `\x1b` byte to PTY.
+    //   Tier 3 — neither → fall through to existing PTY/keymap path (unchanged).
+    if key.code == KeyCode::Esc && key.modifiers == KeyModifiers::NONE {
+        // Tier 1: overlay selection clear.
+        if app.selection.is_some() {
+            app.selection = None;
+            app.mark_dirty();
+            return;
+        }
+        // Tier 2 (Phase 7): forward to delegating tmux in copy-mode.
+        // Tmux's vi-mode default Esc = clear-selection; our Plan 07-02 ensure_config
+        // override binds Escape → cancel for single-press exit (RESEARCH §Tmux
+        // Defaults — CRITICAL Esc asymmetry).
+        if app.active_session_delegates_to_tmux() && app.tmux_in_copy_mode() {
+            app.write_active_tab_input(&[0x1b]);
+            // Locally clear the flag — tmux's `cancel` exits copy-mode, no
+            // observable round-trip needed.
+            app.tmux_in_copy_mode_set(false);
+            return;
+        }
+        // Tier 3: fall through to existing path (PTY forward in Terminal mode,
+        // or keymap in Normal mode — both unchanged).
     }
 
     if app.mode == InputMode::Terminal {
