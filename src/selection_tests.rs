@@ -758,3 +758,146 @@ async fn esc_with_active_selection_clears_and_marks_dirty() {
         "Esc branch must consume the event (mode unchanged, NOT forwarded to PTY)"
     );
 }
+
+// =============================================================================
+// 06-06 — Tab / workspace switch selection-clear tests
+// =============================================================================
+//
+// D-22 says selection clears on tab switch and on workspace switch — the
+// anchored generation is per-session, so cross-session highlight is
+// meaningless. These tests prove that the canonical switch primitives
+// (`App::set_active_tab` and `App::select_active_workspace`) drop any
+// active selection AND mark the frame dirty.
+
+/// Build a minimal `Project` + active `Workspace` + 2 `TabSpec` stubs into
+/// `app.global_state`, so `app.set_active_tab(1)` can advance from index 0
+/// to index 1 against a real workspace.tabs vec. No PTY spawn — the
+/// selection-clear path doesn't read session state.
+fn seed_two_tab_workspace(app: &mut App) {
+    use crate::state::{Agent, Project, TabSpec, Workspace, WorkspaceStatus};
+
+    let project = Project {
+        id: "test-project-2tabs".to_string(),
+        name: "test-project-2tabs".to_string(),
+        repo_root: std::env::temp_dir().join("martins-test-2tabs"),
+        base_branch: "main".to_string(),
+        workspaces: vec![Workspace {
+            name: "ws".to_string(),
+            worktree_path: std::env::temp_dir().join("martins-test-2tabs-ws"),
+            base_branch: "main".to_string(),
+            agent: Agent::default(),
+            status: WorkspaceStatus::Active,
+            created_at: "2026-04-24T00:00:00Z".to_string(),
+            tabs: vec![
+                TabSpec {
+                    id: 1,
+                    command: "shell".to_string(),
+                },
+                TabSpec {
+                    id: 2,
+                    command: "shell".to_string(),
+                },
+            ],
+        }],
+        added_at: "2026-04-24T00:00:00Z".to_string(),
+        expanded: true,
+    };
+    app.global_state.projects = vec![project];
+    app.global_state.active_project_id =
+        Some(app.global_state.projects[0].id.clone());
+    app.active_project_idx = Some(0);
+    app.active_workspace_idx = Some(0);
+    app.active_tab = 0;
+}
+
+/// Build a minimal `Project` with 2 active `Workspace` entries. Used by the
+/// workspace-switch test to exercise `select_active_workspace(1)`.
+fn seed_two_workspaces(app: &mut App) {
+    use crate::state::{Agent, Project, Workspace, WorkspaceStatus};
+
+    let mk_ws = |name: &str| Workspace {
+        name: name.to_string(),
+        worktree_path: std::env::temp_dir().join(format!("martins-test-2ws-{name}")),
+        base_branch: "main".to_string(),
+        agent: Agent::default(),
+        status: WorkspaceStatus::Active,
+        created_at: "2026-04-24T00:00:00Z".to_string(),
+        tabs: Vec::new(),
+    };
+    let project = Project {
+        id: "test-project-2ws".to_string(),
+        name: "test-project-2ws".to_string(),
+        repo_root: std::env::temp_dir().join("martins-test-2ws"),
+        base_branch: "main".to_string(),
+        workspaces: vec![mk_ws("ws-a"), mk_ws("ws-b")],
+        added_at: "2026-04-24T00:00:00Z".to_string(),
+        expanded: true,
+    };
+    app.global_state.projects = vec![project];
+    app.global_state.active_project_id =
+        Some(app.global_state.projects[0].id.clone());
+    app.active_project_idx = Some(0);
+    app.active_workspace_idx = Some(0);
+    app.active_tab = 0;
+}
+
+/// Helper: a non-empty seeded selection with a text snapshot — so
+/// `clear_selection` actually has something to drop and `mark_dirty` fires.
+fn seeded_selection() -> SelectionState {
+    SelectionState {
+        start_col: 0,
+        start_row: 0,
+        start_gen: 0,
+        end_col: 4,
+        end_row: 0,
+        end_gen: Some(0),
+        dragging: false,
+        text: Some("hello".to_string()),
+    }
+}
+
+/// SEL-03 / D-22 / D-23 — `App::set_active_tab(idx)` clears the active
+/// selection, advances `active_tab`, and marks dirty.
+#[tokio::test]
+async fn tab_switch_clears_selection() {
+    let mut app = make_app("tab-switch-clears").await;
+    seed_two_tab_workspace(&mut app);
+
+    app.selection = Some(seeded_selection());
+    app.dirty = false;
+    assert!(app.selection.is_some());
+    assert_eq!(app.active_tab, 0);
+
+    app.set_active_tab(1);
+
+    assert!(
+        app.selection.is_none(),
+        "D-22: tab switch must clear selection"
+    );
+    assert_eq!(app.active_tab, 1);
+    assert!(app.dirty, "D-23: set_active_tab must mark_dirty");
+}
+
+/// SEL-03 / D-22 / D-23 — `App::select_active_workspace(idx)` clears the
+/// active selection before advancing `active_workspace_idx`. Existing
+/// invariant `right_list.select(None)` is preserved.
+#[tokio::test]
+async fn workspace_switch_clears_selection() {
+    let mut app = make_app("workspace-switch-clears").await;
+    seed_two_workspaces(&mut app);
+
+    app.selection = Some(seeded_selection());
+    app.dirty = false;
+
+    app.select_active_workspace(1);
+
+    assert!(
+        app.selection.is_none(),
+        "D-22: workspace switch must clear selection"
+    );
+    assert_eq!(app.active_workspace_idx, Some(1));
+    assert!(
+        app.dirty,
+        "D-23: select_active_workspace clearing must mark_dirty"
+    );
+}
