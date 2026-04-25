@@ -28,7 +28,8 @@ Requirements for the fluidity milestone. Each maps to exactly one roadmap phase.
 
 <!-- Ghostty-style drag-select + cmd+c copy in the main PTY pane. -->
 
-- [ ] **SEL-01**: Mouse drag on the PTY main pane starts a text selection with a visible highlight that tracks the cursor with no lag
+- [x] **SEL-01
+**: Mouse drag on the PTY main pane starts a text selection with a visible highlight that tracks the cursor with no lag
 - [x] **SEL-02
 **: `cmd+c` while a selection is active copies the selected text to the macOS clipboard via `pbcopy`
 - [x] **SEL-03
