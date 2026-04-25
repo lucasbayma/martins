@@ -76,6 +76,65 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
         rect_contains(inner, mouse.column, mouse.row)
     });
 
+    // Phase 7 (D-07/D-08): conditional intercept of Left-button events when
+    // the inner program has not requested mouse mode AND we're not on alternate
+    // screen. Forward as raw SGR (1006) bytes into the wrapped tmux PTY, which
+    // owns visual feedback via its native copy-mode-vi bindings (defaults +
+    // ensure_config 3-line overrides from Plan 07-02).
+    //
+    // Gates per RESEARCH §Pitfall #1: in-terminal AND no modal AND no picker —
+    // otherwise modal/picker clicks would leak as tmux clipboard clicks.
+    if in_terminal
+        && matches!(app.modal, Modal::None)
+        && app.picker.is_none()
+        && app.active_session_delegates_to_tmux()
+    {
+        let inner = terminal_content_rect(app.last_panes.as_ref().unwrap().terminal);
+        let local_col = mouse.column.saturating_sub(inner.x);
+        let local_row = mouse.row.saturating_sub(inner.y);
+        let forwarded = matches!(
+            mouse.kind,
+            MouseEventKind::Down(MouseButton::Left)
+                | MouseEventKind::Drag(MouseButton::Left)
+                | MouseEventKind::Up(MouseButton::Left)
+        );
+        if forwarded {
+            // Pitfall #2: clear any stale overlay selection from a prior
+            // mouse-app session (e.g. user just quit vim). Otherwise the
+            // residual REVERSED highlight would render alongside tmux's own.
+            if app.selection.is_some() {
+                app.clear_selection();
+            }
+            if let Some(bytes) =
+                encode_sgr_mouse(mouse.kind, mouse.modifiers, local_col, local_row)
+            {
+                app.write_active_tab_input(&bytes);
+            }
+            // State machine for tmux_in_copy_mode (RESEARCH §State Source — Option a):
+            // Down  → set true   (tmux will enter copy-mode on the drag-or-click)
+            // Drag  → set drag_seen true
+            // Up    → if drag_seen was set, leave in_copy_mode true (selection now
+            //         shown by tmux); else set in_copy_mode false (single click,
+            //         no copy-mode entered).
+            match mouse.kind {
+                MouseEventKind::Down(MouseButton::Left) => app.tmux_in_copy_mode_set(true),
+                MouseEventKind::Drag(MouseButton::Left) => app.tmux_drag_seen_set(true),
+                MouseEventKind::Up(MouseButton::Left) => {
+                    if !app.tmux_drag_seen_take() {
+                        app.tmux_in_copy_mode_set(false);
+                    }
+                }
+                _ => {}
+            }
+            // Do NOT mark_dirty — tmux's PTY output triggers redraw through the
+            // existing drain → output_notify → mark_dirty path.
+            return;
+        }
+        // Non-forwarded variants (Moved, scroll, etc.) fall through to the
+        // existing match below — overlay path will route ScrollUp/Down via its
+        // own SGR encode at events.rs:195-196.
+    }
+
     if in_terminal {
         match mouse.kind {
             MouseEventKind::Drag(MouseButton::Left) => {

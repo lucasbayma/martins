@@ -38,6 +38,30 @@ fn mouse_event(
     }
 }
 
+/// Flip the active session's vt100 parser into mouse-mode (DECSET 1000h —
+/// X10/Press-Release tracking) so `App::active_session_delegates_to_tmux()`
+/// returns `false` and the Phase 6 overlay path runs in `handle_mouse`.
+///
+/// Without this, fresh `/bin/cat` PtySessions have
+/// `mouse_protocol_mode == None && !alternate_screen` → Phase 7's conditional
+/// intercept (Plan 07-04) short-circuits to the SGR-forward branch and skips
+/// overlay state mutation. These Phase 6 tests validate the overlay path;
+/// Phase 7's forward path is validated by
+/// `tmux_native_selection_tests::TM-DISPATCH-*` (Plan 07-04 Task 2) and the
+/// Plan 07-06 manual UAT.
+///
+/// Note: `\x1b[?1006h` (SGR encoding flag) does NOT flip
+/// `mouse_protocol_mode` — it only changes the wire format once a mode is on.
+/// Use `\x1b[?1000h` (or 1002/1003) to actually enter a mouse-tracking mode.
+fn flip_active_parser_to_mouse_mode(app: &App) {
+    let sessions = app.active_sessions();
+    let (_, session) = sessions
+        .get(app.active_tab)
+        .expect("flip_active_parser_to_mouse_mode: no active session");
+    let mut parser = session.parser.write().expect("parser write");
+    parser.process(b"\x1b[?1000h");
+}
+
 /// Write `text` to a `PtySession`'s stdin and poll its parser until
 /// `contains` appears in the visible screen contents (or 2s elapses).
 /// Used by Tests 2/4/5 to ensure the parser has materialized echoed text
@@ -326,6 +350,8 @@ async fn drag_creates_selection_anchored_at_current_gen() {
             .expect("spawn /bin/cat failed");
     session.scroll_generation.fetch_add(42, Ordering::Relaxed);
     let _tab_id = app.inject_test_session(session);
+    // Phase 7: flip parser to mouse-mode so overlay path runs in handle_mouse.
+    flip_active_parser_to_mouse_mode(&app);
 
     // inner = terminal_content_rect({0,2,80,20}) = {x:1, y:4, width:78, height:17}
     // mouse @ (col=10, row=5) → inner_col = 9, inner_row = 1
@@ -366,6 +392,8 @@ async fn mouse_up_snapshots_selection_text_and_anchors_end() {
     // Echo "hello world" into the PTY; wait for parser to materialize it.
     write_and_wait_for_text(&mut session, "hello world\n", "hello").await;
     let _tab_id = app.inject_test_session(session);
+    // Phase 7: flip parser to mouse-mode so overlay path runs in handle_mouse.
+    flip_active_parser_to_mouse_mode(&app);
 
     // Drag from "hello" start (col=0) to "hello" end (col=4) on row 0
     // (inner-space). Screen coords: col=1..=5, row=4 (inner.y=4, inner.x=1).
@@ -461,6 +489,8 @@ async fn double_click_selects_word() {
             .expect("spawn /bin/cat failed");
     write_and_wait_for_text(&mut session, "hello world\n", "hello").await;
     let _tab_id = app.inject_test_session(session);
+    // Phase 7: flip parser to mouse-mode so overlay path runs in handle_mouse.
+    flip_active_parser_to_mouse_mode(&app);
 
     // First click — counter goes to 1, no word-select yet.
     // mouse @ (col=3, row=4): inner_col=2, inner_row=0 — middle of "hello".
@@ -514,6 +544,8 @@ async fn triple_click_selects_line() {
             .expect("spawn /bin/cat failed");
     write_and_wait_for_text(&mut session, "the quick fox\n", "fox").await;
     let _tab_id = app.inject_test_session(session);
+    // Phase 7: flip parser to mouse-mode so overlay path runs in handle_mouse.
+    flip_active_parser_to_mouse_mode(&app);
 
     // Three clicks on the same row, each <100ms apart (well under 300ms).
     // mouse @ (col=5, row=4): inner_col=4, inner_row=0.
