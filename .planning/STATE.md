@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: planning
 stopped_at: Phase 6 context gathered
-last_updated: "2026-04-24T22:48:13.984Z"
+last_updated: "2026-04-25T01:42:07.751Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 16
+  total_plans: 22
   completed_plans: 19
-  percent: 100
+  percent: 86
 ---
 
 # Project State
@@ -120,4 +120,4 @@ Next: Phase 5 Plan 02 (Wave 1) — implement App::save_state_spawn (makes BG-05 
 
 **Completed Phase:** 3 (PTY Input Fluidity) — 1 of 1 plan executed (03-02 skipped per UAT) — 2026-04-24
 
-**Planned Phase:** 5 (Background Work Decoupling) — 4 plans — 2026-04-24T21:30:42.888Z
+**Planned Phase:** 06 (text-selection) — 6 plans — 2026-04-25T01:42:07.741Z
