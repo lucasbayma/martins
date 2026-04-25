@@ -23,6 +23,11 @@ pub struct PtySession {
     status: Arc<Mutex<PtyStatus>>,
     pub exit_rx: Option<oneshot::Receiver<i32>>,
     pub last_output: Arc<Mutex<std::time::Instant>>,
+    /// Per-session counter incremented by the PTY reader thread when a
+    /// vertical scroll is inferred (see RESEARCH §Q1 SCROLLBACK-LEN
+    /// heuristic). Plans 06-03 (drag anchor) and 06-05 (render
+    /// translation) read this to keep selections stable across scroll.
+    pub scroll_generation: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl PtySession {
@@ -67,6 +72,9 @@ impl PtySession {
         let last_output = Arc::new(Mutex::new(std::time::Instant::now()));
         let last_output_clone = Arc::clone(&last_output);
 
+        let scroll_gen = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let scroll_gen_clone = Arc::clone(&scroll_gen);
+
         let (exit_tx, exit_rx) = oneshot::channel::<i32>();
 
         std::thread::spawn(move || {
@@ -90,7 +98,22 @@ impl PtySession {
                     }
                     Ok(n) => {
                         if let Ok(mut parser) = parser_clone.write() {
+                            // SCROLLBACK-LEN heuristic (RESEARCH §Q1): infer a
+                            // vertical scroll happened by checking that the
+                            // cursor was at (or past) the bottom row before the
+                            // process() call AND the top visible row hash
+                            // changed across the call.
+                            let (rows, cols) = parser.screen().size();
+                            let before_cursor_row =
+                                parser.screen().cursor_position().0;
+                            let before_top_hash = row_hash(parser.screen(), 0, cols);
                             parser.process(&buf[..n]);
+                            let after_top_hash = row_hash(parser.screen(), 0, cols);
+                            let scrolled = before_cursor_row >= rows.saturating_sub(1)
+                                && before_top_hash != after_top_hash;
+                            if scrolled {
+                                scroll_gen_clone.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }
                         }
                         *last_output_clone.lock().unwrap() = std::time::Instant::now();
                         if let Some(notify) = &output_notify {
@@ -117,6 +140,7 @@ impl PtySession {
             status,
             exit_rx: Some(exit_rx),
             last_output,
+            scroll_generation: scroll_gen,
         })
     }
 
@@ -197,6 +221,22 @@ impl Drop for PtySession {
     fn drop(&mut self) {
         let _ = self.kill();
     }
+}
+
+/// Hash the contents of one visible row in the vt100 screen. Used by the
+/// PTY reader thread's SCROLLBACK-LEN heuristic (RESEARCH §Q1) to detect
+/// whether the top row's text changed across a `parser.process()` call —
+/// a strong signal that a vertical scroll happened. Cost is O(cols),
+/// negligible compared to the vt100 parse itself.
+fn row_hash(screen: &vt100::Screen, row: u16, cols: u16) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for col in 0..cols {
+        if let Some(cell) = screen.cell(row, col) {
+            cell.contents().hash(&mut h);
+        }
+    }
+    h.finish()
 }
 
 #[cfg(test)]
