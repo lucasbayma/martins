@@ -136,8 +136,12 @@ pub async fn switch_project(app: &mut App, idx: usize) {
 
     app.active_project_idx = Some(idx);
     app.global_state.active_project_id = Some(new_project_id);
+    // D-22: switching projects leaves the previous session's selection
+    // meaningless. Clear BEFORE the index change so the next render
+    // never observes a stale selection against the new active session.
+    app.clear_selection();
     app.active_workspace_idx = app.global_state.projects[idx].active().next().map(|_| 0);
-    app.active_tab = 0;
+    app.set_active_tab(0);
     app.preview_lines = None;
     app.right_list.select(None);
     app.refresh_diff_spawn();
@@ -220,8 +224,11 @@ pub async fn confirm_remove_project(app: &mut App, form: &RemoveProjectForm) {
     if let Some(idx) = app.active_project_idx {
         switch_project(app, idx).await;
     } else {
+        // D-22: removing the last project drops every session — selection
+        // anchored to a now-deleted PtySession is meaningless.
+        app.clear_selection();
         app.active_workspace_idx = None;
-        app.active_tab = 0;
+        app.set_active_tab(0);
         app.modified_files.clear();
         app.right_list.select(None);
         app.preview_lines = None;
@@ -273,8 +280,11 @@ pub async fn create_workspace(app: &mut App, name: Option<String>) -> Result<(),
         .active_project()
         .map(|p| p.active().count())
         .unwrap_or(0);
+    // D-22: a fresh workspace has its own session — drop any prior
+    // selection before advancing the workspace index.
+    app.clear_selection();
     app.active_workspace_idx = active_count.checked_sub(1);
-    app.active_tab = 0;
+    app.set_active_tab(0);
     app.save_state_spawn();
 
     let _ = create_tab(app, "shell".to_string()).await;
@@ -314,7 +324,8 @@ pub async fn create_tab(app: &mut App, command: String) -> Result<(), String> {
             id: next_id,
             command: command.clone(),
         });
-        app.active_tab = workspace.tabs.len() - 1;
+        let new_idx = workspace.tabs.len() - 1;
+        app.set_active_tab(new_idx);
     }
 
     app.pty_manager

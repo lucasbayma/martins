@@ -227,7 +227,11 @@ pub async fn handle_click(app: &mut App, col: u16, row: u16) {
                 match click {
                     TabClick::Select(idx) => dispatch_action(app, Action::ClickTab(idx)).await,
                     TabClick::Close(idx) => {
-                        app.active_tab = idx;
+                        // D-22: tab-close click first focuses the tab
+                        // (selection invariant: anchored gen is per-session,
+                        // so the about-to-be-closed tab's selection is
+                        // meaningless), then dispatches the close.
+                        app.set_active_tab(idx);
                         dispatch_action(app, Action::CloseTab).await;
                     }
                     TabClick::Add => dispatch_action(app, Action::NewTab).await,
@@ -347,7 +351,9 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) {
                 .map(|ws| ws.tabs.len())
                 .unwrap_or(0);
             if tab_count > 0 {
-                app.active_tab = (n as usize - 1).min(tab_count - 1);
+                // D-22: tab switch via F1..F9 number-key clears any
+                // active selection (per-session anchored gen).
+                app.set_active_tab((n as usize - 1).min(tab_count - 1));
                 app.mode = InputMode::Terminal;
             }
             return;
@@ -531,15 +537,22 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
             crate::tmux::kill_session(&tmux_name);
             app.pty_manager.close_tab(&project_id, &ws_name, tab.id);
 
-            if let Some(project) = app.active_project_mut()
+            let new_active_tab = if let Some(project) = app.active_project_mut()
                 && let Some(workspace) = project.workspaces.iter_mut().find(|workspace| workspace.name == ws_name)
             {
                 workspace.tabs.retain(|existing| existing.id != tab.id);
                 if workspace.tabs.is_empty() {
-                    app.active_tab = 0;
+                    Some(0)
                 } else {
-                    app.active_tab = current_active_tab.min(workspace.tabs.len() - 1);
+                    Some(current_active_tab.min(workspace.tabs.len() - 1))
                 }
+            } else {
+                None
+            };
+            if let Some(idx) = new_active_tab {
+                // D-22: closing a tab implicitly switches to a different
+                // session — the killed tab's selection is gone with it.
+                app.set_active_tab(idx);
             }
 
             app.save_state_spawn();
@@ -551,8 +564,9 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
             if workspace.tabs.is_empty() {
                 return;
             }
-
-            app.active_tab = (n as usize - 1).min(workspace.tabs.len() - 1);
+            let new_idx = (n as usize - 1).min(workspace.tabs.len() - 1);
+            // D-22: keymap-driven tab switch clears any active selection.
+            app.set_active_tab(new_idx);
             app.mode = InputMode::Terminal;
         }
         Action::NewWorkspace | Action::NewWorkspaceAuto => {
@@ -631,7 +645,9 @@ pub async fn dispatch_action(app: &mut App, action: Action) {
             }
         }
         Action::ClickTab(idx) => {
-            app.active_tab = idx;
+            // D-22: tab pick from the right-list / dispatch_action route
+            // clears any active selection.
+            app.set_active_tab(idx);
             app.mode = InputMode::Terminal;
         }
         Action::ClickFile(idx) => {
