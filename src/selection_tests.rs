@@ -187,3 +187,40 @@ async fn click_counter_resets_when_row_differs() {
         "click at different row must reset counter to 1"
     );
 }
+
+/// SEL-04 — `PtySession.scroll_generation` increments when piped input
+/// overflows the visible 24-row area. This is the sole source of scroll
+/// events for selection-stability (see RESEARCH §Q1 SCROLLBACK-LEN
+/// heuristic and CONTEXT D-05).
+#[tokio::test]
+async fn scroll_generation_increments_on_vertical_scroll() {
+    use crate::pty::session::PtySession;
+    use std::sync::atomic::Ordering;
+    use std::time::Instant;
+
+    // write_input takes &mut self → bind as `mut`. Mirrors src/pty_input_tests.rs:18.
+    let mut session =
+        PtySession::spawn(std::env::temp_dir(), "/bin/cat", &[], 24, 80)
+            .expect("spawn /bin/cat failed");
+
+    // Feed 30 newlines — enough to overflow the 24-row visible area.
+    for i in 0..30 {
+        let line = format!("line{i}\n");
+        session.write_input(line.as_bytes()).expect("write_input");
+    }
+
+    // Poll for up to 500ms for the reader thread to drain.
+    let deadline = Instant::now() + Duration::from_millis(500);
+    let mut gen_count = 0u64;
+    while Instant::now() < deadline {
+        gen_count = session.scroll_generation.load(Ordering::Relaxed);
+        if gen_count > 0 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert!(
+        gen_count > 0,
+        "scroll_generation never incremented; got {gen_count}"
+    );
+}
