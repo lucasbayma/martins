@@ -115,6 +115,26 @@ impl PtyManager {
         self.sessions
             .get(&(project_id.to_string(), ws_id.to_string(), tab_id))
     }
+
+    /// Test-only: register a pre-built `PtySession` under the given
+    /// `(project_id, ws_id, tab_id)` key without going through
+    /// `spawn_tab`. Mirrors the production `spawn_tab` insert at the
+    /// HashMap level — downstream selection tests use this seam to seed
+    /// an active session synchronously so they can inspect
+    /// `session.scroll_generation` and parser state without paying the
+    /// `PtySession::spawn_with_notify` cost on every test.
+    ///
+    /// Gated `#[cfg(test)]` so it never appears in production binaries.
+    #[cfg(test)]
+    pub(crate) fn insert_for_test(
+        &mut self,
+        project_id: String,
+        ws_id: WorkspaceId,
+        tab_id: TabId,
+        session: PtySession,
+    ) {
+        self.sessions.insert((project_id, ws_id, tab_id), session);
+    }
 }
 
 impl Default for PtyManager {

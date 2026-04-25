@@ -603,3 +603,79 @@ impl App {
 #[cfg(test)]
 #[path = "app_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+impl App {
+    /// Test-only: register a pre-spawned `PtySession` as the active tab
+    /// of the active workspace of the active project. Creates a minimal
+    /// `Project` + `Workspace` + `TabSpec` stub if none exist. Returns
+    /// the assigned tab id.
+    ///
+    /// Downstream selection tests (Plans 03, 04, 06) use this seam to
+    /// inspect `session.scroll_generation` and PTY parser state without
+    /// going through the full `PtyManager::spawn_tab` path. Gated
+    /// `#[cfg(test)]` so production binary surface is unchanged.
+    #[allow(dead_code)]
+    pub(crate) fn inject_test_session(
+        &mut self,
+        session: crate::pty::session::PtySession,
+    ) -> u32 {
+        use crate::state::{Agent, Project, TabSpec, Workspace, WorkspaceStatus};
+
+        // Ensure a project exists.
+        if self.global_state.projects.is_empty() {
+            let project = Project {
+                id: "test-project".to_string(),
+                name: "test-project".to_string(),
+                repo_root: std::env::temp_dir().join("martins-test-project"),
+                base_branch: "main".to_string(),
+                workspaces: Vec::new(),
+                added_at: "2026-04-24T00:00:00Z".to_string(),
+                expanded: true,
+            };
+            self.global_state.projects.push(project);
+        }
+        self.active_project_idx = Some(0);
+        self.global_state.active_project_id =
+            Some(self.global_state.projects[0].id.clone());
+
+        // Ensure a workspace exists in the active project.
+        let project = &mut self.global_state.projects[0];
+        if project.workspaces.is_empty() {
+            project.workspaces.push(Workspace {
+                name: "test-ws".to_string(),
+                worktree_path: std::env::temp_dir().join("martins-test-ws"),
+                base_branch: "main".to_string(),
+                agent: Agent::default(),
+                status: WorkspaceStatus::Inactive,
+                created_at: "2026-04-24T00:00:00Z".to_string(),
+                tabs: Vec::new(),
+            });
+        }
+        self.active_workspace_idx = Some(0);
+
+        // Append a tab to the active workspace.
+        let workspace = &mut self.global_state.projects[0].workspaces[0];
+        let tab_id: u32 = workspace
+            .tabs
+            .iter()
+            .map(|t| t.id)
+            .max()
+            .map(|m| m + 1)
+            .unwrap_or(1);
+        workspace.tabs.push(TabSpec {
+            id: tab_id,
+            command: "/bin/cat".to_string(),
+        });
+        self.active_tab = workspace.tabs.len() - 1;
+
+        // Insert the session into pty_manager keyed on
+        // (project_id, ws_name, tab_id).
+        let project_id = self.global_state.projects[0].id.clone();
+        let ws_name = self.global_state.projects[0].workspaces[0].name.clone();
+        self.pty_manager
+            .insert_for_test(project_id, ws_name, tab_id, session);
+
+        tab_id
+    }
+}
