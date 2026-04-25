@@ -28,6 +28,21 @@ pub struct PtySession {
     /// heuristic). Plans 06-03 (drag anchor) and 06-05 (render
     /// translation) read this to keep selections stable across scroll.
     pub scroll_generation: Arc<std::sync::atomic::AtomicU64>,
+    /// Phase 7: set on forwarded Down(Left) when delegating to tmux; cleared
+    /// on Up(Left) without prior Drag (single click, no copy-mode entered),
+    /// on tab-switch (via App::set_active_tab cancel), on Esc-cancel forward,
+    /// and on observed copy-mode-exit. Read by handle_key Esc / click-outside
+    /// handlers (Plan 07-05) to decide whether to forward `\x1b` byte or run
+    /// `tmux send-keys -X cancel`.
+    ///
+    /// Per 07-RESEARCH.md §State Source — Option (a) Martins-side state machine
+    /// (no subprocess polling on hot paths).
+    pub tmux_in_copy_mode: Arc<std::sync::atomic::AtomicBool>,
+    /// Phase 7: transient flag — set on forwarded Drag(Left); read+cleared
+    /// on Up(Left) to distinguish "click without drag" (Up clears in_copy_mode
+    /// because tmux never entered copy-mode) from "click→drag→release" (Up
+    /// keeps in_copy_mode = true because tmux is now showing a selection).
+    pub tmux_drag_seen: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl PtySession {
@@ -74,6 +89,9 @@ impl PtySession {
 
         let scroll_gen = Arc::new(std::sync::atomic::AtomicU64::new(0));
         let scroll_gen_clone = Arc::clone(&scroll_gen);
+
+        let tmux_in_copy_mode = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let tmux_drag_seen = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
         let (exit_tx, exit_rx) = oneshot::channel::<i32>();
 
@@ -141,6 +159,8 @@ impl PtySession {
             exit_rx: Some(exit_rx),
             last_output,
             scroll_generation: scroll_gen,
+            tmux_in_copy_mode,
+            tmux_drag_seen,
         })
     }
 
