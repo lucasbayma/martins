@@ -1,8 +1,8 @@
 ---
 phase: 06-text-selection
 verified: 2026-04-24T00:00:00Z
-status: human_needed
-score: 4/4 must-haves verified (automated portion); 2 manual UAT items remain
+status: passed
+score: 4/4 must-haves verified; 6/6 manual UAT items passed (operator-approved 2026-04-25)
 overrides_applied: 0
 re_verification: null
 human_verification:

@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: PTY Input Fluidity** - Typing in the agent pane renders each keystroke immediately, even under heavy PTY output
 - [x] **Phase 4: Navigation Fluidity** - Sidebar, workspace, and tab switching all respond instantly with no stutter on keyboard or mouse
 - [x] **Phase 5: Background Work Decoupling** - Diff refresh, file watcher, and state save never block the event loop or cause random lag spikes
-- [ ] **Phase 6: Text Selection** - Drag-select + `cmd+c` copy in the PTY pane, Ghostty-style, with a highlight that survives streaming output
+- [x] **Phase 6: Text Selection** - Drag-select + `cmd+c` copy in the PTY pane, Ghostty-style, with a highlight that survives streaming output (2026-04-25)
 
 ## Phase Details
 
@@ -126,4 +126,23 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. PTY Input Fluidity | 1/1 | Complete | 2026-04-24 |
 | 4. Navigation Fluidity | 0/TBD | Not started | - |
 | 5. Background Work Decoupling | 0/4 | Not started | - |
-| 6. Text Selection | 5/6 | In progress | - |
+| 6. Text Selection | 6/6 | Complete | 2026-04-25 |
+
+## Backlog
+
+### Phase 999.1: tmux-native main-screen selection (BACKLOG)
+
+**Goal:** [Captured for future planning] Migrate main-pane text selection from Martins' REVERSED-XOR overlay to the underlying tmux session's native copy-mode, so selection in the PTY pane feels indistinguishable from running tmux directly. Operator-flagged during Phase 6 UAT 2026-04-25 — current overlay works but feels non-native vs tmux's own selection.
+
+**Investigation surface:**
+- Does Martins' main pane render the tmux session directly enough to enable tmux's copy-mode bindings (mouse + cmd+c forwarded into tmux)?
+- How does tmux copy-mode interact with Martins' own `SelectionState` and clear-on-tab/workspace-switch wiring?
+- Alt-screen apps (vim, less) should keep the overlay since they don't have tmux-native selection to delegate to.
+
+**Reference:** `.planning/phases/06-text-selection/06-HUMAN-UAT.md` "Forward-Looking Notes" section.
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)

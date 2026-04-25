@@ -24,6 +24,7 @@ Martins is a Rust TUI workspace orchestrator for macOS that manages git worktree
 - ✓ Atomic state persistence to `~/.martins/state.json` + backup — existing
 - ✓ Homebrew distribution + universal macOS binary — existing
 - ✓ **REQ-PERF-02**: Sidebar navigation responds instantly — validated in Phase 4 (Navigation Fluidity): NAV-01..04 user UAT sign-off 2026-04-24, `refresh_diff` made fire-and-forget on nav hot path via `refresh_diff_spawn` + mpsc drain branch
+- ✓ **REQ-PERF-04**: Text selection in the PTY main pane works via mouse drag, with `cmd+c` copy (Ghostty-style), with no lag — validated in Phase 6 (Text Selection): SEL-01..04 operator UAT sign-off 2026-04-25, REVERSED-XOR highlight + anchored-coord translation via `PtySession.scroll_generation` keeps the highlight stable through streaming PTY output; cmd+c→pbcopy, Esc/click clears, double-click word, triple-click line, shift+click extend, clear-on-tab/workspace-switch all wired
 
 ### Active
 
@@ -31,7 +32,6 @@ Martins is a Rust TUI workspace orchestrator for macOS that manages git worktree
 
 - [ ] **REQ-PERF-01**: Typing in the PTY pane feels immediate — no perceptible lag between keystroke and on-screen character (baseline: Ghostty/Alacritty feel)
 - [ ] **REQ-PERF-03**: Workspace/tab switching is instantaneous — no visible pause or re-render stutter
-- [ ] **REQ-PERF-04**: Text selection in the PTY main pane works via mouse drag, with `cmd+c` copy (Ghostty-style), with no lag
 - [ ] **REQ-PERF-05**: Periodic lag spikes caused by background work (git diff refresh, file watcher, state saves) are eliminated
 - [ ] **REQ-ARCH-01**: Refactor `src/app.rs` (2000+ line monolith) into focused modules during perf work — event routing, modal controller, workspace lifecycle, draw orchestration
 
@@ -76,7 +76,7 @@ Martins is a Rust TUI workspace orchestrator for macOS that manages git worktree
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Success criterion = subjective feel test (not ms metric) | User wants "feels like Ghostty," not a number to chase; metrics risk goodharting | — Pending |
-| Text selection scope = drag-select + `cmd+c` copy (Ghostty-like) | Matches native terminal baseline; scrollback search deferred | — Pending |
+| Text selection scope = drag-select + `cmd+c` copy (Ghostty-like) | Matches native terminal baseline; scrollback search deferred | ✓ Validated in Phase 6 (2026-04-25); operator-noted preference to migrate main-screen selection to native tmux copy-mode in a future phase |
 | Diff refresh → event-driven + 30s safety net (drop 5s timer) | `notify` already watches; 5s timer is redundant and causes periodic lag spikes | — Pending |
 | `src/app.rs` refactor is in-scope for this milestone | User approved riding momentum while touching event loop; avoids re-touching same code later | — Pending |
 | No platform expansion (macOS-only stays) | Keeps surface area small; cross-platform conflicts with responsiveness goal | ✓ Good |
@@ -99,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-24 after Phase 4 (Navigation Fluidity) completion*
+*Last updated: 2026-04-25 after Phase 6 (Text Selection) completion*
