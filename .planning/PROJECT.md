@@ -8,32 +8,47 @@ Martins is a Rust TUI workspace orchestrator for macOS that manages git worktree
 
 **Input-to-pixel responsiveness must feel like a native GPU-accelerated terminal.** If typing, clicking, switching workspaces, or selecting text in the PTY pane feels laggy, the app fails — users will reach for Ghostty/Alacritty + tmux directly.
 
-## Requirements
+## Current State
 
-### Validated
+**v1.0 Fluidity — SHIPPED 2026-04-27.** All 7 phases / 22 plans / 145 tests delivered. Architectural split, dirty-flag rendering, input-priority select, PTY input fluidity, navigation fluidity, background-work decoupling, and Ghostty-style PTY-pane text selection (overlay + tmux-native dual-path) all validated by operator UAT.
 
-<!-- Inferred from existing code at `.planning/codebase/`. -->
+Full archive: [`.planning/milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md).
 
-- ✓ Multi-project workspace model with git worktree per workspace — existing
-- ✓ Per-workspace tmux session persistence (survives app restart) — existing
-- ✓ Per-workspace configurable AI agent (Claude/Opencode/Codex) + multiple tabs — existing
-- ✓ 3-pane responsive TUI layout (sidebar / PTY main / diff sidebar) via ratatui — existing
-- ✓ Modal dialog system (new workspace, new project, confirm, file picker) — existing
-- ✓ Live git diff tracking (modified files) via file-watcher + periodic refresh — existing
-- ✓ Workspace lifecycle (create, archive, delete, prune) via CLI + TUI — existing
-- ✓ Atomic state persistence to `~/.martins/state.json` + backup — existing
-- ✓ Homebrew distribution + universal macOS binary — existing
-- ✓ **REQ-PERF-02**: Sidebar navigation responds instantly — validated in Phase 4 (Navigation Fluidity): NAV-01..04 user UAT sign-off 2026-04-24, `refresh_diff` made fire-and-forget on nav hot path via `refresh_diff_spawn` + mpsc drain branch
-- ✓ **REQ-PERF-04**: Text selection in the PTY main pane works via mouse drag, with `cmd+c` copy (Ghostty-style), with no lag — validated in Phase 6 (Text Selection): SEL-01..04 operator UAT sign-off 2026-04-25, REVERSED-XOR highlight + anchored-coord translation via `PtySession.scroll_generation` keeps the highlight stable through streaming PTY output; cmd+c→pbcopy, Esc/click clears, double-click word, triple-click line, shift+click extend, clear-on-tab/workspace-switch all wired
+## Next Milestone Goals
 
-### Active
+(Awaiting planning. Run `/gsd-new-milestone` to start.)
 
-<!-- Current milestone: make Martins feel native-terminal-fluid. -->
+Backlog candidates from v1.0 (parked, not yet sequenced):
 
-- [ ] **REQ-PERF-01**: Typing in the PTY pane feels immediate — no perceptible lag between keystroke and on-screen character (baseline: Ghostty/Alacritty feel)
-- [ ] **REQ-PERF-03**: Workspace/tab switching is instantaneous — no visible pause or re-render stutter
-- [ ] **REQ-PERF-05**: Periodic lag spikes caused by background work (git diff refresh, file watcher, state saves) are eliminated
-- [ ] **REQ-ARCH-01**: Refactor `src/app.rs` (2000+ line monolith) into focused modules during perf work — event routing, modal controller, workspace lifecycle, draw orchestration
+- **Block/rectangle selection mode toggle** — alternative to default stream selection in PTY-pane (operator post-GAP-7-01)
+- **5 Info findings from Phase 7 code review** — IN-01..IN-05 polish-time consolidation
+- **Code review back-fill for Phases 1–6** — only Phase 7 had `/gsd-code-review` run during v1.0
+- **Security gate for Phase 7** — `/gsd-secure-phase 7` not run; accept-or-revisit
+- **v2 candidates** — observability (OBS-01/02 tracing spans, optional FPS overlay), scrollback (SCR-01/02 search + full copy), robustness (ROB-01/02 `.unwrap()` audit, workspace transactional rollback)
+
+## Validated Capabilities
+
+<!-- Inferred from existing code at `.planning/codebase/` + v1.0 milestone deliverables. -->
+
+### Pre-existing (validated at milestone start)
+
+- ✓ Multi-project workspace model with git worktree per workspace
+- ✓ Per-workspace tmux session persistence (survives app restart)
+- ✓ Per-workspace configurable AI agent (Claude/Opencode/Codex) + multiple tabs
+- ✓ 3-pane responsive TUI layout (sidebar / PTY main / diff sidebar) via ratatui
+- ✓ Modal dialog system (new workspace, new project, confirm, file picker)
+- ✓ Live git diff tracking (modified files) via file-watcher + periodic refresh
+- ✓ Workspace lifecycle (create, archive, delete, prune) via CLI + TUI
+- ✓ Atomic state persistence to `~/.martins/state.json` + backup
+- ✓ Homebrew distribution + universal macOS binary
+
+### Validated in v1.0 Fluidity
+
+- ✓ **PTY input fluidity** (PTY-01..03) — Phase 3: each keystroke renders within one frame; agent log streaming doesn't delay input; idle CPU drops to near-zero
+- ✓ **Navigation fluidity** (NAV-01..04) — Phase 4: sidebar/workspace/tab switching all respond instantly via `refresh_diff_spawn` fire-and-forget + mpsc drain branch
+- ✓ **Background-work decoupling** (BG-01..05) — Phase 5: event-driven diff (debounced `notify` + 30s safety net), async state save, no lag spikes
+- ✓ **Architectural split** (ARCH-01..03) — Phases 1+2: `src/app.rs` 2000+ → 436 LOC; events/workspace/modal_controller/draw modules; dirty-flag rendering; input-priority `tokio::select!` biased branch
+- ✓ **PTY-pane text selection** (SEL-01..04, dual-path) — Phases 6+7: drag-select with REVERSED-XOR overlay (mouse-app sessions) + tmux-native copy-mode delegate (non-mouse-app sessions); cmd+c 3-tier (overlay → tmux paste-buffer → SIGINT); Esc 3-tier; tab-switch cancel; selection survives streaming PTY output via `Arc<AtomicU64> scroll_generation` anchoring
 
 ### Out of Scope
 
@@ -75,11 +90,12 @@ Martins is a Rust TUI workspace orchestrator for macOS that manages git worktree
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Success criterion = subjective feel test (not ms metric) | User wants "feels like Ghostty," not a number to chase; metrics risk goodharting | — Pending |
-| Text selection scope = drag-select + `cmd+c` copy (Ghostty-like) | Matches native terminal baseline; scrollback search deferred | ✓ Validated in Phase 6 (2026-04-25); operator-noted preference to migrate main-screen selection to native tmux copy-mode in a future phase |
-| Diff refresh → event-driven + 30s safety net (drop 5s timer) | `notify` already watches; 5s timer is redundant and causes periodic lag spikes | — Pending |
-| `src/app.rs` refactor is in-scope for this milestone | User approved riding momentum while touching event loop; avoids re-touching same code later | — Pending |
-| No platform expansion (macOS-only stays) | Keeps surface area small; cross-platform conflicts with responsiveness goal | ✓ Good |
+| Success criterion = subjective feel test (not ms metric) | User wants "feels like Ghostty," not a number to chase; metrics risk goodharting | ✓ Validated across v1.0 — every phase used qualitative UAT; no numeric SLA goodharting |
+| Text selection scope = drag-select + `cmd+c` copy (Ghostty-like) | Matches native terminal baseline; scrollback search deferred | ✓ Validated in Phase 6 (2026-04-25), extended to dual-path (overlay + tmux-native) in Phase 7 (2026-04-25). GAP-7-01 visual style mismatch resolved via tmux mode-style render (2026-04-27) |
+| Diff refresh → event-driven + 30s safety net (drop 5s timer) | `notify` already watches; 5s timer is redundant and causes periodic lag spikes | ✓ Validated in Phase 5 — BG-01..05 all met; no random lag spikes reported |
+| `src/app.rs` refactor is in-scope for this milestone | User approved riding momentum while touching event loop; avoids re-touching same code later | ✓ Validated in Phase 1 — `src/app.rs` 2000+ → 436 LOC; every subsequent phase built on the split without regressions |
+| No platform expansion (macOS-only stays) | Keeps surface area small; cross-platform conflicts with responsiveness goal | ✓ Good (held throughout v1.0) |
+| Phase 7 = dual-path (tmux delegate for non-mouse-app, Phase 6 overlay for mouse-app) | Operator wanted "feels like native tmux" but inner mouse-app TUIs (vim mouse=a, htop, opencode) need their own mouse handling | ✓ Validated 2026-04-25 — operator UAT signed off on dual-path; D-01 boundary held |
 
 ## Evolution
 
@@ -99,4 +115,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-25 after Phase 6 (Text Selection) completion*
+*Last updated: 2026-04-27 at v1.0 Fluidity milestone close. Next: `/gsd-new-milestone` to define v1.1.*

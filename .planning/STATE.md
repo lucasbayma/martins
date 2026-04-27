@@ -1,36 +1,38 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: milestone_complete
-stopped_at: Phase 7 completed (operator UAT signed off 2026-04-25)
-last_updated: "2026-04-25T14:50:00.000Z"
-last_activity: 2026-04-25 -- Phase 07 completed (tmux-native main-screen selection — dual-path UAT all PASS)
+milestone: v1.1
+milestone_name: TBD (run /gsd-new-milestone)
+status: between_milestones
+stopped_at: v1.0 Fluidity shipped 2026-04-27 (tag v1.0)
+last_updated: "2026-04-27T14:30:00.000Z"
+last_activity: 2026-04-27 -- v1.0 Fluidity milestone archived (7 phases / 22 plans / 145 tests)
 progress:
-  total_phases: 7
-  completed_phases: 8
-  total_plans: 28
-  completed_plans: 28
-  percent: 114
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+last_shipped_milestone: v1.0
+last_shipped_at: 2026-04-27
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-23)
+See: .planning/PROJECT.md (updated 2026-04-27 at v1.0 close)
 
 **Core value:** Input-to-pixel responsiveness must feel like a native GPU-accelerated terminal (Ghostty/Alacritty baseline).
-**Current focus:** Phase 07 — tmux-native-main-screen-selection
+**Current focus:** Between milestones — run `/gsd-new-milestone` to plan v1.1.
+
+**Last shipped:** v1.0 Fluidity (2026-04-27) — see [`.planning/milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md).
 
 ## Current Position
 
-Phase: 07
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-04-25
+Status: Between milestones (v1.0 shipped, v1.1 awaiting planning)
+Last activity: 2026-04-27
 
-Progress: [██████████] 100%
+Progress: [—————————————————————] (no active milestone)
 
 ## Performance Metrics
 
@@ -124,11 +126,17 @@ None yet.
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone close:
+Items acknowledged at v1.0 milestone close on 2026-04-27.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| uat_gaps | 01-HUMAN-UAT.md | passed (0 pending scenarios — audit residual) | 2026-04-27 |
+| uat_gaps | 06-HUMAN-UAT.md | passed (0 pending scenarios — audit residual) | 2026-04-27 |
+| uat_gaps | 07-HUMAN-UAT.md | passed (0 pending scenarios — audit residual) | 2026-04-27 |
+
+All 3 UAT files have `status: passed` and 0 pending scenarios; the audit
+tool flags any UAT.md with scenarios listed regardless of pass status. No
+real debt — included here for milestone-close traceability per workflow.
 
 ## Session Continuity
 
