@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-04-27
+
+The Fluidity milestone. Eliminate input lag, render-loop CPU burn, and background-work spikes; ship Ghostty-style text selection on the PTY main pane. Single-contributor work over 4 days, 22 plans, 0 → 145 tests, operator-validated against the qualitative "feels like Ghostty" gate.
+
+### Added
+
+- **Dual-path PTY-pane text selection** — tmux-native delegate path for non-mouse-app sessions (bash/zsh) plus REVERSED-XOR overlay retained for mouse-app sessions (vim mouse=a, htop, opencode). Selection feels indistinguishable from running tmux directly in Ghostty
+- **3-tier `cmd+c` precedence:** overlay selection → tmux paste-buffer (`tmux save-buffer | pbcopy`) → SIGINT to active PTY
+- **3-tier `Esc` precedence:** overlay clear → forward `\x1b` to delegating tmux (single-press copy-mode exit) → fall-through to PTY
+- **Tab/workspace switch cancels outgoing tmux selection** so leftover highlights don't persist across navigation
+- **Selection survives streaming PTY output** via anchored coordinate translation (`Arc<AtomicU64> scroll_generation` on `PtySession`, drain-loop sourced)
+- **Double-click word selection, triple-click line selection, shift+click extend** in the overlay path
+- **Auto-copy on mouse-up** in the delegate path via tmux's `copy-pipe-and-cancel pbcopy`
+- `MARTINS_MOUSE_DEBUG` env var for diagnostic mouse-event + selection-render tracing (zero-cost when off, opt-in for future bug investigations)
+
+### Changed
+
+- **`src/app.rs` split** from 2000+ LOC monolith into focused modules: `events.rs` (event routing + `encode_sgr_mouse`), `workspace.rs` (lifecycle), `ui/modal_controller.rs` (modal dispatch), `ui/draw.rs` (top-level render). Final `app.rs` core: 436 LOC
+- **Render loop now gated by dirty-flag** — `terminal.draw()` only fires when state changed; idle CPU drops to near-zero
+- **`tokio::select!` made biased with input branch first** — keyboard/mouse never starved by PTY output bursts or background timers
+- **Diff refresh: 5s polling timer dropped** in favor of event-driven flow via debounced `notify` (~200ms) plus a 30s safety-net fallback
+- **Tab/workspace switching: `refresh_diff` is fire-and-forget** via new `refresh_diff_spawn` + `mpsc` drain branch — no blank-frame stutter on the nav hot path
+- **State save (`~/.martins/state.json`):** 13 hot-path call sites migrated to async `save_state_spawn`; archive `remove_dir_all` wrapped in `spawn_blocking`
+- **Overlay selection highlight:** switched from XOR-toggled `Modifier::REVERSED` to tmux's default `mode-style` (fg=Black, bg=Yellow) for visual parity with native tmux
+- **Per-gesture delegation latch** (`tmux_gesture_delegating: Arc<AtomicBool>`) — Drag/Up always honor the latch even if the inner program flips mouse mode mid-gesture, preventing tmux's button state from getting orphaned
+
+### Fixed
+
+- Per-keystroke render lag in the PTY pane (PTY-01..03)
+- Sidebar/workspace/tab-switch latency — instant on keyboard or mouse (NAV-01..04)
+- Random lag spikes from background work (BG-01..05): no more 5s polling-timer pauses, no more blocking state writes
+- Selection highlight no longer flickers, jitters, or disappears under streaming PTY output (SEL-04)
+- `set_active_tab` now clears `tmux_in_copy_mode` and `tmux_drag_seen` flags on the outgoing session before mutating `active_tab`, preventing stale state on tab round-trip
+
 ## [0.7.0] - 2026-04-21
 
 ### Added
