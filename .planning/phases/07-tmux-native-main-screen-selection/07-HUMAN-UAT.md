@@ -1,7 +1,24 @@
+---
+status: passed
+phase: 07-tmux-native-main-screen-selection
+source: [07-VERIFICATION.md, 07-RESEARCH.md, 07-VALIDATION.md]
+started: 2026-04-25T11:48:00Z
+updated: 2026-04-27T00:00:00Z
+operator: lucasobayma@gmail.com
+total_cases: 11
+passed: 11
+failed: 0
+pitfall_sweeps_passed: 2
+phase6_regression_passed: 4
+subjective_parity_yes: true
+gap_7_01_resolved: true
+related_artifacts: [07-VERIFICATION.md, 07-REVIEW.md, 07-REVIEW-FIX.md]
+---
+
 # Phase 7 — Human UAT
 
 **Phase:** 07-tmux-native-main-screen-selection
-**Date:** 2026-04-25
+**Date:** 2026-04-25 (post-`gap-closure` 2026-04-27)
 **Operator:** lucasobayma@gmail.com
 
 ## Setup

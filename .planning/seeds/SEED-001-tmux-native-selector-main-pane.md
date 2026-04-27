@@ -1,13 +1,25 @@
 ---
 id: SEED-001
-status: dormant
+status: realized
 planted: 2026-04-24
 planted_during: v1.0 / Phase 1 (Architectural Split) — just completed
 trigger_when: Phase 6 (Text Selection) is being discussed or planned; any milestone that revisits text selection / clipboard / PTY pane interaction
 scope: Medium
+realized_in: v1.0 / Phase 7 (tmux-native-main-screen-selection)
+realized_at: 2026-04-25
+realized_summary: |
+  Phase 7 implemented this seed exactly: handle_mouse conditional intercept
+  forwards SGR mouse bytes to wrapped tmux when inner program is non-mouse-app
+  (delegate path); mouse-app sessions retain Phase 6 REVERSED-XOR overlay.
+  cmd+c follows 3-tier precedence (overlay → tmux paste-buffer → SIGINT).
+  Esc 3-tier (overlay → tmux PTY forward → fall-through). tab-switch cancels
+  outgoing tmux selection. Operator dual-pane UAT signed off "approved";
+  GAP-7-01 (visual style mismatch) resolved by switching overlay highlight
+  from XOR-REVERSED to tmux mode-style (fg=Black, bg=Yellow). See
+  .planning/phases/07-tmux-native-main-screen-selection/PHASE-SUMMARY.md.
 ---
 
-# SEED-001: Tela principal deve ter seletor nativo do tmux (copy-mode)
+# SEED-001: Tela principal deve ter seletor nativo do tmux (copy-mode) — REALIZED in Phase 7
 
 ## Why This Matters
 
