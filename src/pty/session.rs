@@ -43,6 +43,17 @@ pub struct PtySession {
     /// because tmux never entered copy-mode) from "click→drag→release" (Up
     /// keeps in_copy_mode = true because tmux is now showing a selection).
     pub tmux_drag_seen: Arc<std::sync::atomic::AtomicBool>,
+    /// WR-02 (Phase 07 review): per-gesture delegation latch. Set on forwarded
+    /// `Down(Left)` when delegation is active, cleared on forwarded `Up(Left)`
+    /// (after the matching release reaches tmux), or on tab-switch via
+    /// `App::set_active_tab`. While true, `handle_mouse` forces the
+    /// forwarding branch for `Drag/Up(Left)` regardless of the live
+    /// `active_session_delegates_to_tmux()` value. Prevents the orphaned
+    /// half-gesture scenario where the inner program toggles DECSET 1000h /
+    /// 1049h between Down and Up — without the latch, tmux would never
+    /// receive the matching Up, leaving its button-state machine stuck and
+    /// `tmux_in_copy_mode` permanently true until the next forwarded Up.
+    pub tmux_gesture_delegating: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl PtySession {
@@ -92,6 +103,7 @@ impl PtySession {
 
         let tmux_in_copy_mode = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let tmux_drag_seen = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let tmux_gesture_delegating = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
         let (exit_tx, exit_rx) = oneshot::channel::<i32>();
 
@@ -161,6 +173,7 @@ impl PtySession {
             scroll_generation: scroll_gen,
             tmux_in_copy_mode,
             tmux_drag_seen,
+            tmux_gesture_delegating,
         })
     }
 

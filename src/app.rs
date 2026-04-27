@@ -405,17 +405,20 @@ impl App {
         if let Some(name) = self.active_tmux_session_name() {
             crate::tmux::cancel_copy_mode(&name);
         }
-        // WR-01 (Phase 07 review): mirror events.rs:564 contract — when
-        // `cancel_copy_mode` exits tmux's copy-mode on the OUTGOING session,
-        // also clear that session's `tmux_in_copy_mode` AtomicBool. Otherwise
-        // the flag stays stuck `true` and on return to this tab the next Esc
-        // routes through Esc-Tier-2, forwarding `\x1b` to a non-copy-mode tmux
-        // which passes it through to the inner program. Done BEFORE mutating
-        // `active_tab` so the helpers operate on the OUTGOING session. Also
-        // clear `tmux_drag_seen` for symmetry — a gesture interrupted by
-        // tab-switch would otherwise leave drag latched on the outgoing tab.
+        // WR-01 (Phase 07 review): mirror events.rs:564 contract — when we exit
+        // tmux's copy-mode on the OUTGOING session, also clear that session's
+        // tmux_in_copy_mode AtomicBool. Otherwise the flag stays stuck `true`
+        // and on return to this tab the next Esc routes through Esc-Tier-2,
+        // forwarding `\x1b` to a non-copy-mode tmux which passes it through to
+        // the inner program. Also clear `tmux_drag_seen` for symmetry — a
+        // gesture interrupted by tab-switch would otherwise leave drag latched.
+        // Done BEFORE mutating active_tab so we operate on the outgoing session.
         self.tmux_in_copy_mode_set(false);
         self.tmux_drag_seen_set(false);
+        // WR-02 (Phase 07 review): clear the per-gesture delegation latch on
+        // tab-switch so a subsequent gesture on this session re-evaluates
+        // delegation freshly.
+        self.tmux_gesture_delegating_set(false);
         self.clear_selection();
         self.active_tab = index;
         self.mark_dirty();
@@ -633,6 +636,33 @@ impl App {
         session
             .tmux_drag_seen
             .swap(false, std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// WR-02 (Phase 07 review): read the active session's per-gesture delegation
+    /// latch. While true, `handle_mouse` must force the forwarding branch for
+    /// `Drag/Up(Left)` regardless of the live `active_session_delegates_to_tmux`
+    /// value, so the inner program toggling DECSET 1000h / 1049h between Down
+    /// and Up does not orphan tmux's button-state machine.
+    pub(crate) fn tmux_gesture_delegating(&self) -> bool {
+        let sessions = self.active_sessions();
+        let Some((_, session)) = sessions.get(self.active_tab) else {
+            return false;
+        };
+        session
+            .tmux_gesture_delegating
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// WR-02 (Phase 07 review): set the active session's gesture latch. Set on
+    /// forwarded `Down(Left)`, cleared on forwarded `Up(Left)` after the matching
+    /// release reaches tmux, or on tab-switch via [`set_active_tab`].
+    pub(crate) fn tmux_gesture_delegating_set(&self, value: bool) {
+        let sessions = self.active_sessions();
+        if let Some((_, session)) = sessions.get(self.active_tab) {
+            session
+                .tmux_gesture_delegating
+                .store(value, std::sync::atomic::Ordering::Relaxed);
+        }
     }
 
     /// Compute the word-boundary `(start_col, end_col)` containing `col` on

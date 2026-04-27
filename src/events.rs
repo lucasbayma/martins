@@ -109,10 +109,20 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
     //
     // Gates per RESEARCH §Pitfall #1: in-terminal AND no modal AND no picker —
     // otherwise modal/picker clicks would leak as tmux clipboard clicks.
+    //
+    // WR-02 (Phase 07 review): the delegation decision is *latched per gesture*
+    // — once a `Down(Left)` is forwarded, the matching `Drag/Up(Left)` events
+    // continue forwarding even if the inner program toggles DECSET 1000h /
+    // 1049h mid-gesture. Without the latch, tmux would never receive the
+    // matching Up, leaving its button-state machine stuck and
+    // `tmux_in_copy_mode` stuck `true` until the next legitimate forwarded Up.
+    let live_delegating = app.active_session_delegates_to_tmux();
+    let gesture_latched = app.tmux_gesture_delegating();
+    let delegating = live_delegating || gesture_latched;
     if in_terminal
         && matches!(app.modal, Modal::None)
         && app.picker.is_none()
-        && app.active_session_delegates_to_tmux()
+        && delegating
     {
         let inner = terminal_content_rect(app.last_panes.as_ref().unwrap().terminal);
         let local_col = mouse.column.saturating_sub(inner.x);
@@ -123,7 +133,18 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
                 | MouseEventKind::Drag(MouseButton::Left)
                 | MouseEventKind::Up(MouseButton::Left)
         );
-        if forwarded {
+        // WR-02: a Down only opens a forwarded gesture when delegation is live.
+        // If we entered this block solely on the `gesture_latched` path, a fresh
+        // Down(Left) with no live delegation would mean the prior gesture's Up
+        // was lost — defensively close that gesture rather than starting a new
+        // one. Drag/Up always honor the latch (that is the whole point).
+        let open_new_gesture = matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
+            && live_delegating;
+        let continue_gesture = matches!(
+            mouse.kind,
+            MouseEventKind::Drag(MouseButton::Left) | MouseEventKind::Up(MouseButton::Left)
+        ) && (live_delegating || gesture_latched);
+        if forwarded && (open_new_gesture || continue_gesture) {
             // Pitfall #2: clear any stale overlay selection from a prior
             // mouse-app session (e.g. user just quit vim). Otherwise the
             // residual REVERSED highlight would render alongside tmux's own.
@@ -141,13 +162,19 @@ pub async fn handle_mouse(app: &mut App, mouse: MouseEvent) {
             // Up    → if drag_seen was set, leave in_copy_mode true (selection now
             //         shown by tmux); else set in_copy_mode false (single click,
             //         no copy-mode entered).
+            //
+            // WR-02: latch on Down, release on Up so the gesture is atomic.
             match mouse.kind {
-                MouseEventKind::Down(MouseButton::Left) => app.tmux_in_copy_mode_set(true),
+                MouseEventKind::Down(MouseButton::Left) => {
+                    app.tmux_in_copy_mode_set(true);
+                    app.tmux_gesture_delegating_set(true);
+                }
                 MouseEventKind::Drag(MouseButton::Left) => app.tmux_drag_seen_set(true),
                 MouseEventKind::Up(MouseButton::Left) => {
                     if !app.tmux_drag_seen_take() {
                         app.tmux_in_copy_mode_set(false);
                     }
+                    app.tmux_gesture_delegating_set(false);
                 }
                 _ => {}
             }
