@@ -22,7 +22,7 @@ use crate::ui::theme;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
 };
@@ -45,6 +45,7 @@ pub fn render(
     focused: bool,
     workspace_info: Option<&WorkspaceInfo>,
     selection: Option<&SelectionState>,
+    current_gen: u64,
 ) {
     if tab_specs.is_empty() {
         let block = Block::default()
@@ -155,21 +156,70 @@ pub fn render(
 
     if let Some(sel) = selection {
         if !sel.is_empty() {
-            let ((sc, sr), (ec, er)) = sel.normalized();
-            let buf = frame.buffer_mut();
-            for row in sr..=er {
-                if row >= inner.height {
-                    break;
-                }
-                let c_start = if row == sr { sc } else { 0 };
-                let c_end = if row == er { ec } else { inner.width.saturating_sub(1) };
-                for col in c_start..=c_end {
-                    if col >= inner.width {
+            let ((sc_raw, sr_raw), (ec_raw, er_raw)) = sel.normalized();
+            // D-06: translate anchored rows to current-screen rows.
+            // current_row = anchored_row - (current_gen - sel_gen)
+            let start_delta = current_gen.saturating_sub(sel.start_gen);
+            // D-07: mid-drag end is cursor-relative — delta=0 when end_gen is None.
+            let end_delta = sel
+                .end_gen
+                .map(|g| current_gen.saturating_sub(g))
+                .unwrap_or(0);
+            let sr_translated = (sr_raw as i64) - (start_delta as i64);
+            let er_translated = (er_raw as i64) - (end_delta as i64);
+            // GAP-7-01 instrumentation: env-var gated selection-render tracing for
+            // hypothesis E (scroll-generation false-positive inflates overlay translation).
+            // Set MARTINS_MOUSE_DEBUG=1 to log per-frame selection geometry.
+            if std::env::var_os("MARTINS_MOUSE_DEBUG").is_some() {
+                eprintln!(
+                    "[sel-render] raw=({},{})->({},{}) gens=start{}/end{:?}/curr{} \
+                     deltas=({},{}) translated={}->{}",
+                    sc_raw,
+                    sr_raw,
+                    ec_raw,
+                    er_raw,
+                    sel.start_gen,
+                    sel.end_gen,
+                    current_gen,
+                    start_delta,
+                    end_delta,
+                    sr_translated,
+                    er_translated
+                );
+            }
+            // D-08: if entire selection has scrolled off (end row above top),
+            // render nothing — but SelectionState stays in app state.
+            if er_translated >= 0 {
+                let sr = sr_translated.max(0) as u16;
+                let er = er_translated.max(0) as u16;
+                // D-08: clip start column to 0 if the start row was clipped.
+                let sc = if sr_translated < 0 { 0 } else { sc_raw };
+                let ec = ec_raw;
+                let buf = frame.buffer_mut();
+                for row in sr..=er {
+                    if row >= inner.height {
                         break;
                     }
-                    if let Some(cell) = buf.cell_mut((inner.x + col, inner.y + row)) {
-                        cell.set_bg(theme::ACCENT_GOLD);
-                        cell.set_fg(theme::BG_SURFACE);
+                    let c_start = if row == sr { sc } else { 0 };
+                    let c_end = if row == er { ec } else { inner.width.saturating_sub(1) };
+                    for col in c_start..=c_end {
+                        if col >= inner.width {
+                            break;
+                        }
+                        if let Some(cell) = buf.cell_mut((inner.x + col, inner.y + row)) {
+                            // GAP-7-01 fix: match tmux's default `mode-style`
+                            // (fg=black, bg=yellow). Operator wants selection feel
+                            // indistinguishable from running tmux directly in
+                            // Ghostty. Apply explicit style instead of XOR-toggling
+                            // REVERSED so the highlight is uniform regardless of
+                            // underlying cell state (status bars, already-reversed
+                            // text, syntax-highlighted regions all render as the
+                            // same yellow block). Clear pre-existing REVERSED first
+                            // so the new fg/bg pair shows through cleanly.
+                            cell.modifier.remove(Modifier::REVERSED);
+                            cell.fg = Color::Black;
+                            cell.bg = Color::Yellow;
+                        }
                     }
                 }
             }
@@ -177,6 +227,60 @@ pub fn render(
     }
 
 
+}
+
+/// #[cfg(test)] shim mirroring the production highlight pass over an
+/// arbitrary `Rect` + `SelectionState`. Lets the render tests exercise
+/// REVERSED toggling and anchored-coord translation without spawning a
+/// PtySession or constructing the full `tab_specs`/`sessions` argument
+/// fan-out that `render` requires.
+#[cfg(test)]
+pub(crate) fn render_with_selection_for_test(
+    frame: &mut ratatui::Frame,
+    area: ratatui::layout::Rect,
+    selection: Option<&crate::app::SelectionState>,
+    current_gen: u64,
+) {
+    let inner = area;
+    let Some(sel) = selection else { return };
+    if sel.is_empty() {
+        return;
+    }
+    let ((sc_raw, sr_raw), (ec_raw, er_raw)) = sel.normalized();
+    let start_delta = current_gen.saturating_sub(sel.start_gen);
+    let end_delta = sel
+        .end_gen
+        .map(|g| current_gen.saturating_sub(g))
+        .unwrap_or(0);
+    let sr_translated = (sr_raw as i64) - (start_delta as i64);
+    let er_translated = (er_raw as i64) - (end_delta as i64);
+    if er_translated < 0 {
+        return;
+    }
+    let sr = sr_translated.max(0) as u16;
+    let er = er_translated.max(0) as u16;
+    let sc = if sr_translated < 0 { 0 } else { sc_raw };
+    let ec = ec_raw;
+    let buf = frame.buffer_mut();
+    for row in sr..=er {
+        if row >= inner.height {
+            break;
+        }
+        let c_start = if row == sr { sc } else { 0 };
+        let c_end = if row == er { ec } else { inner.width.saturating_sub(1) };
+        for col in c_start..=c_end {
+            if col >= inner.width {
+                break;
+            }
+            if let Some(cell) = buf.cell_mut((inner.x + col, inner.y + row)) {
+                // Mirror production behavior: GAP-7-01 fix replaced XOR-REVERSED
+                // with tmux's default mode-style (fg=black, bg=yellow).
+                cell.modifier.remove(Modifier::REVERSED);
+                cell.fg = Color::Black;
+                cell.bg = Color::Yellow;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -191,7 +295,7 @@ mod tests {
 
         terminal
             .draw(|frame| {
-                render(frame, frame.area(), &[], &[], 0, InputMode::Normal, false, None, None);
+                render(frame, frame.area(), &[], &[], 0, InputMode::Normal, false, None, None, 0);
             })
             .unwrap();
 
@@ -208,7 +312,7 @@ mod tests {
 
         terminal
             .draw(|frame| {
-                render(frame, frame.area(), &[], &[], 0, InputMode::Terminal, true, None, None);
+                render(frame, frame.area(), &[], &[], 0, InputMode::Terminal, true, None, None, 0);
             })
             .unwrap();
     }

@@ -23,6 +23,37 @@ pub struct PtySession {
     status: Arc<Mutex<PtyStatus>>,
     pub exit_rx: Option<oneshot::Receiver<i32>>,
     pub last_output: Arc<Mutex<std::time::Instant>>,
+    /// Per-session counter incremented by the PTY reader thread when a
+    /// vertical scroll is inferred (see RESEARCH §Q1 SCROLLBACK-LEN
+    /// heuristic). Plans 06-03 (drag anchor) and 06-05 (render
+    /// translation) read this to keep selections stable across scroll.
+    pub scroll_generation: Arc<std::sync::atomic::AtomicU64>,
+    /// Phase 7: set on forwarded Down(Left) when delegating to tmux; cleared
+    /// on Up(Left) without prior Drag (single click, no copy-mode entered),
+    /// on tab-switch (via App::set_active_tab cancel), on Esc-cancel forward,
+    /// and on observed copy-mode-exit. Read by handle_key Esc / click-outside
+    /// handlers (Plan 07-05) to decide whether to forward `\x1b` byte or run
+    /// `tmux send-keys -X cancel`.
+    ///
+    /// Per 07-RESEARCH.md §State Source — Option (a) Martins-side state machine
+    /// (no subprocess polling on hot paths).
+    pub tmux_in_copy_mode: Arc<std::sync::atomic::AtomicBool>,
+    /// Phase 7: transient flag — set on forwarded Drag(Left); read+cleared
+    /// on Up(Left) to distinguish "click without drag" (Up clears in_copy_mode
+    /// because tmux never entered copy-mode) from "click→drag→release" (Up
+    /// keeps in_copy_mode = true because tmux is now showing a selection).
+    pub tmux_drag_seen: Arc<std::sync::atomic::AtomicBool>,
+    /// WR-02 (Phase 07 review): per-gesture delegation latch. Set on forwarded
+    /// `Down(Left)` when delegation is active, cleared on forwarded `Up(Left)`
+    /// (after the matching release reaches tmux), or on tab-switch via
+    /// `App::set_active_tab`. While true, `handle_mouse` forces the
+    /// forwarding branch for `Drag/Up(Left)` regardless of the live
+    /// `active_session_delegates_to_tmux()` value. Prevents the orphaned
+    /// half-gesture scenario where the inner program toggles DECSET 1000h /
+    /// 1049h between Down and Up — without the latch, tmux would never
+    /// receive the matching Up, leaving its button-state machine stuck and
+    /// `tmux_in_copy_mode` permanently true until the next forwarded Up.
+    pub tmux_gesture_delegating: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl PtySession {
@@ -67,6 +98,13 @@ impl PtySession {
         let last_output = Arc::new(Mutex::new(std::time::Instant::now()));
         let last_output_clone = Arc::clone(&last_output);
 
+        let scroll_gen = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let scroll_gen_clone = Arc::clone(&scroll_gen);
+
+        let tmux_in_copy_mode = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let tmux_drag_seen = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let tmux_gesture_delegating = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
         let (exit_tx, exit_rx) = oneshot::channel::<i32>();
 
         std::thread::spawn(move || {
@@ -90,7 +128,22 @@ impl PtySession {
                     }
                     Ok(n) => {
                         if let Ok(mut parser) = parser_clone.write() {
+                            // SCROLLBACK-LEN heuristic (RESEARCH §Q1): infer a
+                            // vertical scroll happened by checking that the
+                            // cursor was at (or past) the bottom row before the
+                            // process() call AND the top visible row hash
+                            // changed across the call.
+                            let (rows, cols) = parser.screen().size();
+                            let before_cursor_row =
+                                parser.screen().cursor_position().0;
+                            let before_top_hash = row_hash(parser.screen(), 0, cols);
                             parser.process(&buf[..n]);
+                            let after_top_hash = row_hash(parser.screen(), 0, cols);
+                            let scrolled = before_cursor_row >= rows.saturating_sub(1)
+                                && before_top_hash != after_top_hash;
+                            if scrolled {
+                                scroll_gen_clone.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }
                         }
                         *last_output_clone.lock().unwrap() = std::time::Instant::now();
                         if let Some(notify) = &output_notify {
@@ -117,6 +170,10 @@ impl PtySession {
             status,
             exit_rx: Some(exit_rx),
             last_output,
+            scroll_generation: scroll_gen,
+            tmux_in_copy_mode,
+            tmux_drag_seen,
+            tmux_gesture_delegating,
         })
     }
 
@@ -131,6 +188,23 @@ impl PtySession {
             .unwrap_or(false)
     }
 
+    /// Write bytes to the PTY master writer.
+    ///
+    /// This is **synchronous by design** (PTY-01, PTY-02). Keystroke-sized
+    /// writes (≤8 bytes) never block on a macOS PTY slave buffer (typical
+    /// buffer size 4–16 KiB). Do NOT move this onto a `tokio::task::spawn`:
+    /// the synchronous `write_all` + `flush` guarantees the keystroke lands
+    /// in the child's stdin before the caller returns, which preserves the
+    /// ordering of rapid keystrokes typed into the PTY pane.
+    ///
+    /// Large writes (paste >4 KiB) may block briefly; that case is
+    /// acceptable because a user pasting is aware of the I/O. If a future
+    /// profile flags paste blocking the event loop, chunk the paste write
+    /// across multiple select iterations — do NOT make keystroke writes
+    /// async.
+    ///
+    /// See `.planning/phases/03-pty-input-fluidity/03-RESEARCH.md` §Common
+    /// Pitfalls #2.
     pub fn write_input(&mut self, data: &[u8]) -> Result<()> {
         let writer = self
             .writer
@@ -180,6 +254,22 @@ impl Drop for PtySession {
     fn drop(&mut self) {
         let _ = self.kill();
     }
+}
+
+/// Hash the contents of one visible row in the vt100 screen. Used by the
+/// PTY reader thread's SCROLLBACK-LEN heuristic (RESEARCH §Q1) to detect
+/// whether the top row's text changed across a `parser.process()` call —
+/// a strong signal that a vertical scroll happened. Cost is O(cols),
+/// negligible compared to the vt100 parse itself.
+fn row_hash(screen: &vt100::Screen, row: u16, cols: u16) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for col in 0..cols {
+        if let Some(cell) = screen.cell(row, col) {
+            cell.contents().hash(&mut h);
+        }
+    }
+    h.finish()
 }
 
 #[cfg(test)]

@@ -1,7 +1,9 @@
 //! Module doc.
 
+pub mod draw;
 pub mod layout;
 pub mod modal;
+pub mod modal_controller;
 pub mod picker;
 pub mod preview;
 pub mod sidebar_left;

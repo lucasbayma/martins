@@ -4,6 +4,7 @@ mod cli;
 mod config;
 mod editor;
 mod error;
+mod events;
 mod git;
 mod keys;
 mod logging;
@@ -14,10 +15,26 @@ mod tmux;
 mod tools;
 mod ui;
 mod watcher;
+mod workspace;
+
+#[cfg(test)]
+mod pty_input_tests;
+
+#[cfg(test)]
+mod navigation_tests;
+
+#[cfg(test)]
+mod selection_tests;
+
+#[cfg(test)]
+mod tmux_native_selection_tests;
 
 use anyhow::Result;
 use clap::Parser;
-use crossterm::{event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture}, execute};
+use crossterm::{event::{
+    DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+    KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+}, execute};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -59,14 +76,24 @@ async fn main() -> Result<()> {
     }
 
     let mut terminal = ratatui::init();
-    execute!(std::io::stdout(), EnableMouseCapture, EnableBracketedPaste)?;
+    execute!(
+        std::io::stdout(),
+        EnableMouseCapture,
+        EnableBracketedPaste,
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES),
+    )?;
 
     let result = match app::App::new(global_state, state_path).await {
         Ok(mut app) => app.run(&mut terminal).await,
         Err(error) => Err(error),
     };
 
-    let _ = execute!(std::io::stdout(), DisableMouseCapture, DisableBracketedPaste);
+    let _ = execute!(
+        std::io::stdout(),
+        PopKeyboardEnhancementFlags,
+        DisableMouseCapture,
+        DisableBracketedPaste,
+    );
     ratatui::restore();
     result
 }
