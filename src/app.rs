@@ -405,6 +405,17 @@ impl App {
         if let Some(name) = self.active_tmux_session_name() {
             crate::tmux::cancel_copy_mode(&name);
         }
+        // WR-01 (Phase 07 review): mirror events.rs:564 contract — when
+        // `cancel_copy_mode` exits tmux's copy-mode on the OUTGOING session,
+        // also clear that session's `tmux_in_copy_mode` AtomicBool. Otherwise
+        // the flag stays stuck `true` and on return to this tab the next Esc
+        // routes through Esc-Tier-2, forwarding `\x1b` to a non-copy-mode tmux
+        // which passes it through to the inner program. Done BEFORE mutating
+        // `active_tab` so the helpers operate on the OUTGOING session. Also
+        // clear `tmux_drag_seen` for symmetry — a gesture interrupted by
+        // tab-switch would otherwise leave drag latched on the outgoing tab.
+        self.tmux_in_copy_mode_set(false);
+        self.tmux_drag_seen_set(false);
         self.clear_selection();
         self.active_tab = index;
         self.mark_dirty();
