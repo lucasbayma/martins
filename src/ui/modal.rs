@@ -207,6 +207,7 @@ fn agent_label(agent: &Agent) -> &'static str {
         Agent::Opencode => "opencode",
         Agent::Claude => "claude",
         Agent::Codex => "codex",
+        Agent::Gsd => "gsd",
     }
 }
 

@@ -30,6 +30,11 @@ pub fn detect_agents() -> Vec<AgentInfo> {
             available: detect(&Tool::Codex).is_some(),
             path: detect(&Tool::Codex),
         },
+        AgentInfo {
+            agent: Agent::Gsd,
+            available: detect(&Tool::Gsd).is_some(),
+            path: detect(&Tool::Gsd),
+        },
     ]
 }
 
@@ -91,10 +96,11 @@ mod tests {
     #[test]
     fn detect_agents_returns_list() {
         let agents = detect_agents();
-        assert_eq!(agents.len(), 3);
+        assert_eq!(agents.len(), 4);
         assert!(agents.iter().any(|a| matches!(a.agent, Agent::Opencode)));
         assert!(agents.iter().any(|a| matches!(a.agent, Agent::Claude)));
         assert!(agents.iter().any(|a| matches!(a.agent, Agent::Codex)));
+        assert!(agents.iter().any(|a| matches!(a.agent, Agent::Gsd)));
     }
 
     #[test]

@@ -9,6 +9,7 @@ pub enum Tool {
     Opencode,
     Claude,
     Codex,
+    Gsd,
 }
 
 impl Tool {
@@ -18,6 +19,7 @@ impl Tool {
             Tool::Opencode => "opencode",
             Tool::Claude => "claude",
             Tool::Codex => "codex",
+            Tool::Gsd => "gsd",
         }
     }
 }
@@ -51,7 +53,7 @@ pub struct MissingTools {
 
 /// Run pre-flight check: detect all required tools.
 pub fn preflight() -> MissingTools {
-    let all = [Tool::Bat, Tool::Opencode, Tool::Claude, Tool::Codex];
+    let all = [Tool::Bat, Tool::Opencode, Tool::Claude, Tool::Codex, Tool::Gsd];
     let missing = all.into_iter().filter(|t| detect(t).is_none()).collect();
     MissingTools { tools: missing }
 }
@@ -101,6 +103,7 @@ pub fn install_command(tool: &Tool) -> Option<InstallCmd> {
                 "@openai/codex".to_string(),
             ],
         }),
+        Tool::Gsd => None,
     }
 }
 
