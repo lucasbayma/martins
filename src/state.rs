@@ -24,6 +24,7 @@ pub enum Agent {
     Opencode,
     Claude,
     Codex,
+    Gsd,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

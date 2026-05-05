@@ -372,6 +372,7 @@ impl App {
                 "opencode".to_string(),
                 "claude".to_string(),
                 "codex".to_string(),
+                "gsd".to_string(),
                 "aider".to_string(),
                 "gemini".to_string(),
                 "amp".to_string(),

@@ -24,7 +24,7 @@
 
 Named after the legendary Brazilian maestro **João Carlos Martins** — a man who lost the movement of his hands, twice, and still found a way to conduct an orchestra. Martins is a terminal workspace manager for AI coding agents, built with the same stubbornness: no matter how many tools you juggle, how many projects you run, or how many times you close and reopen your terminal — the show goes on.
 
-Just as Maestro Martins conducts dozens of musicians into a single symphony, this tool orchestrates multiple AI agents — OpenCode, Claude Code, Codex — each running in their own workspace, each on their own branch, all under one baton.
+Just as Maestro Martins conducts dozens of musicians into a single symphony, this tool orchestrates multiple AI agents — OpenCode, Claude Code, Codex, GSD — each running in their own workspace, each on their own branch, all under one baton.
 
 The workspaces carry the spirit of Brazilian music. Names are auto-generated from the tradition of **MPB** — you might get a *caetano*, a *gil*, an *elis*, a *chico*, a *gal*, a *milton*, a *djavan*, a *marisa*. Each workspace is a musician in your orchestra. Each tab is an instrument. Together, they make something worth listening to.
 
@@ -81,7 +81,7 @@ Once inside:
 
 1. **Add a project** — press `a` or click `+ Add Project` in the sidebar. A folder browser opens at `~/`. Navigate to a git repository and press Enter to open it.
 2. **Create a workspace** — press `n`. Type a name or leave blank for auto-generated MPB names (caetano, gil, elis...). The workspace creates an isolated git worktree.
-3. **Open a tab** — press `t` or click `[+]` in the tab bar. Choose an agent (OpenCode, Claude Code, Codex) or a plain shell.
+3. **Open a tab** — press `t` or click `[+]` in the tab bar. Choose an agent (OpenCode, Claude Code, Codex, GSD) or a plain shell.
 4. **Interact with the terminal** — press `i` or click the terminal pane to enter Terminal mode. All keystrokes go to the agent. Press `Esc Esc` to exit back to Normal mode.
 5. **Switch between tabs** — press `1`-`9` or click the tab labels.
 6. **Close and reopen** — press `q` to quit. All tmux sessions persist. Next time you run `martins`, all your tabs and conversations are restored exactly where you left off.
@@ -145,7 +145,7 @@ Each workspace gets its own [git worktree](https://git-scm.com/docs/git-worktree
 - **macOS** (Apple Silicon or Intel)
 - **tmux** — session persistence backend
 - **Git** — worktree and repository management
-- At least one AI agent installed: [OpenCode](https://github.com/nicholaskoerfer/opencode), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), or [Codex](https://github.com/openai/codex)
+- At least one AI agent installed: [OpenCode](https://github.com/nicholaskoerfer/opencode), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://github.com/openai/codex), or GSD
 
 ## Contributing
 
