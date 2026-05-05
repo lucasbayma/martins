@@ -1,7 +1,7 @@
 class Martins < Formula
   desc "Terminal workspace manager for AI coding agents"
   homepage "https://github.com/lucasbayma/martins"
-  version "0.8.0"
+  version "0.9.0"
   license "MIT"
 
   url "https://github.com/lucasbayma/martins/releases/download/v#{version}/martins-macos-universal"

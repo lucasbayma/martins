@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-05-05
+
+### Added
+
+- **GSD agent option** — `gsd` is now a first-class agent alongside `opencode`, `claude`, and `codex`. Detected via `which gsd`, surfaced in the agent picker modal, and included in pre-flight tool checks.
+
 ## [0.8.0] - 2026-04-27
 
 The Fluidity milestone. Eliminate input lag, render-loop CPU burn, and background-work spikes; ship Ghostty-style text selection on the PTY main pane. Single-contributor work over 4 days, 22 plans, 0 → 145 tests, operator-validated against the qualitative "feels like Ghostty" gate.
