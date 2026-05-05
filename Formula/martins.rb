@@ -5,7 +5,7 @@ class Martins < Formula
   license "MIT"
 
   url "https://github.com/lucasbayma/martins/releases/download/v#{version}/martins-macos-universal"
-  sha256 "23e1e6394f80fb6eb6713f429acd3be5404a621a658e35e2bfa58ec1919cffac"
+  sha256 "673e0198d983b0067e4b39418cf4d6c71ce9411d98996d8454a0e91f2ed400d3"
 
   depends_on :macos
   depends_on "tmux"
